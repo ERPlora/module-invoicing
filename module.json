@@ -9,6 +9,7 @@
   "author_email": "support@erplora.com",
   "license": "MIT",
   "category": "accounting",
+  "tags": ["invoicing", "billing", "receipts", "accounting", "pdf", "tax", "documents"],
   "icon": "document-text-outline",
   "homepage": "https://github.com/ERPlora/module-invoicing",
   "repository_url": "https://github.com/ERPlora/module-invoicing",
