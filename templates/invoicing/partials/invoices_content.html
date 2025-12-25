@@ -17,6 +17,7 @@
             <p class="text-sm mt-1" style="color: var(--ion-color-medium);">{% trans "Manage your invoices" %}</p>
         </div>
         <ion-button
+            color="success"
             hx-get="{% url 'invoicing:invoice_create' %}"
             hx-target="#dashboard-content"
             hx-push-url="true">
