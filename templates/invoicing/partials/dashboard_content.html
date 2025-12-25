@@ -1,0 +1,113 @@
+{% load static %}
+{% load i18n %}
+
+{% if request.htmx %}
+<!-- Tab bar update via OOB swap (only on HTMX navigation) -->
+<div id="dashboard-tabbar" hx-swap-oob="innerHTML">
+<ion-footer>
+{% include "invoicing/partials/tabbar.html" with current_view='dashboard' %}
+</ion-footer>
+</div>
+{% endif %}
+
+<div class="ion-padding">
+    <!-- Page Header -->
+    <div class="mb-6">
+        <h1 class="text-2xl font-bold" style="color: var(--ion-text-color);">{% trans "Invoicing" %}</h1>
+        <p class="text-sm mt-1" style="color: var(--ion-color-medium);">{% trans "Invoice management and billing" %}</p>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <ion-card class="m-0">
+            <ion-card-content class="p-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
+                        <ion-icon name="document-text-outline" class="text-xl text-primary"></ion-icon>
+                    </div>
+                    <div>
+                        <div class="text-xs text-medium">{% trans "Total Invoices" %}</div>
+                        <div class="text-xl font-semibold">{{ total_invoices }}</div>
+                    </div>
+                </div>
+            </ion-card-content>
+        </ion-card>
+
+        <ion-card class="m-0">
+            <ion-card-content class="p-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-success/10 rounded-xl flex items-center justify-center">
+                        <ion-icon name="calendar-outline" class="text-xl text-success"></ion-icon>
+                    </div>
+                    <div>
+                        <div class="text-xs text-medium">{% trans "This Month" %}</div>
+                        <div class="text-xl font-semibold">{{ month_invoices }}</div>
+                    </div>
+                </div>
+            </ion-card-content>
+        </ion-card>
+
+        <ion-card class="m-0">
+            <ion-card-content class="p-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-success/10 rounded-xl flex items-center justify-center">
+                        <ion-icon name="cash-outline" class="text-xl text-success"></ion-icon>
+                    </div>
+                    <div>
+                        <div class="text-xs text-medium">{% trans "Month Total" %}</div>
+                        <div class="text-xl font-semibold">€{{ month_total|floatformat:2 }}</div>
+                    </div>
+                </div>
+            </ion-card-content>
+        </ion-card>
+
+        <ion-card class="m-0">
+            <ion-card-content class="p-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-warning/10 rounded-xl flex items-center justify-center">
+                        <ion-icon name="time-outline" class="text-xl text-warning"></ion-icon>
+                    </div>
+                    <div>
+                        <div class="text-xs text-medium">{% trans "Pending" %}</div>
+                        <div class="text-xl font-semibold">€{{ pending_amount|floatformat:2 }}</div>
+                    </div>
+                </div>
+            </ion-card-content>
+        </ion-card>
+    </div>
+
+    <!-- Quick Actions -->
+    <ion-card class="m-0 mb-6">
+        <ion-card-header>
+            <ion-card-title>{% trans "Quick Actions" %}</ion-card-title>
+        </ion-card-header>
+        <ion-card-content>
+            <div class="grid grid-cols-2 gap-4">
+                <ion-button expand="block"
+                    hx-get="{% url 'invoicing:invoice_create' %}"
+                    hx-target="#dashboard-content"
+                    hx-push-url="true">
+                    <ion-icon slot="start" name="add-outline"></ion-icon>
+                    {% trans "New Invoice" %}
+                </ion-button>
+                <ion-button expand="block" fill="outline"
+                    hx-get="{% url 'invoicing:invoices' %}"
+                    hx-target="#dashboard-content"
+                    hx-push-url="true">
+                    <ion-icon slot="start" name="list-outline"></ion-icon>
+                    {% trans "View Invoices" %}
+                </ion-button>
+            </div>
+        </ion-card-content>
+    </ion-card>
+
+    <!-- Info Section -->
+    <div class="p-4 rounded-lg" style="background: var(--ion-color-step-50);">
+        <div class="flex items-start gap-2">
+            <ion-icon name="information-circle-outline" style="font-size: 20px; color: var(--ion-color-primary); margin-top: 2px;"></ion-icon>
+            <p class="text-sm" style="color: var(--ion-color-medium);">
+                {% trans "Create and manage invoices for your sales. Configure invoice series in Settings to customize invoice numbering." %}
+            </p>
+        </div>
+    </div>
+</div>

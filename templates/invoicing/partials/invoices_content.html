@@ -1,0 +1,98 @@
+{% load static %}
+{% load i18n %}
+
+{% if request.htmx %}
+<div id="dashboard-tabbar" hx-swap-oob="innerHTML">
+<ion-footer>
+{% include "invoicing/partials/tabbar.html" with current_view='invoices' %}
+</ion-footer>
+</div>
+{% endif %}
+
+<div class="ion-padding">
+    <!-- Page Header -->
+    <div class="flex justify-between items-center mb-6">
+        <div>
+            <h1 class="text-2xl font-bold" style="color: var(--ion-text-color);">{% trans "Invoices" %}</h1>
+            <p class="text-sm mt-1" style="color: var(--ion-color-medium);">{% trans "Manage your invoices" %}</p>
+        </div>
+        <ion-button
+            hx-get="{% url 'invoicing:invoice_create' %}"
+            hx-target="#dashboard-content"
+            hx-push-url="true">
+            <ion-icon slot="start" name="add-outline"></ion-icon>
+            {% trans "New Invoice" %}
+        </ion-button>
+    </div>
+
+    <!-- Filters -->
+    <ion-card class="m-0 mb-4">
+        <ion-card-content class="p-4">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div class="relative flex-1">
+                    <ion-icon
+                        name="search-outline"
+                        class="absolute left-3 top-1/2 -translate-y-1/2"
+                        style="color: var(--ion-color-medium); pointer-events: none; z-index: 10;">
+                    </ion-icon>
+                    <input
+                        type="text"
+                        name="search"
+                        value="{{ request.GET.search|default:'' }}"
+                        placeholder="{% trans 'Search invoices...' %}"
+                        class="w-full h-10 pl-10 pr-3 rounded-lg"
+                        style="border: 1px solid var(--ion-border-color); background: var(--ion-background-color); color: var(--ion-text-color);"
+                        hx-get="{% url 'invoicing:invoices' %}"
+                        hx-trigger="keyup changed delay:400ms"
+                        hx-target="#invoices-table-container"
+                        hx-include="[name='status'],[name='date_from'],[name='date_to']">
+                </div>
+                <select
+                    name="status"
+                    class="h-10 px-3 rounded-lg"
+                    style="border: 1px solid var(--ion-border-color); background: var(--ion-background-color); color: var(--ion-text-color);"
+                    hx-get="{% url 'invoicing:invoices' %}"
+                    hx-trigger="change"
+                    hx-target="#invoices-table-container"
+                    hx-include="[name='search'],[name='date_from'],[name='date_to']">
+                    <option value="">{% trans "All Status" %}</option>
+                    <option value="draft" {% if request.GET.status == 'draft' %}selected{% endif %}>{% trans "Draft" %}</option>
+                    <option value="issued" {% if request.GET.status == 'issued' %}selected{% endif %}>{% trans "Issued" %}</option>
+                    <option value="paid" {% if request.GET.status == 'paid' %}selected{% endif %}>{% trans "Paid" %}</option>
+                    <option value="cancelled" {% if request.GET.status == 'cancelled' %}selected{% endif %}>{% trans "Cancelled" %}</option>
+                </select>
+                <input
+                    type="date"
+                    name="date_from"
+                    value="{{ request.GET.date_from|default:'' }}"
+                    placeholder="{% trans 'From' %}"
+                    class="h-10 px-3 rounded-lg"
+                    style="border: 1px solid var(--ion-border-color); background: var(--ion-background-color); color: var(--ion-text-color);"
+                    hx-get="{% url 'invoicing:invoices' %}"
+                    hx-trigger="change"
+                    hx-target="#invoices-table-container"
+                    hx-include="[name='search'],[name='status'],[name='date_to']">
+                <input
+                    type="date"
+                    name="date_to"
+                    value="{{ request.GET.date_to|default:'' }}"
+                    placeholder="{% trans 'To' %}"
+                    class="h-10 px-3 rounded-lg"
+                    style="border: 1px solid var(--ion-border-color); background: var(--ion-background-color); color: var(--ion-text-color);"
+                    hx-get="{% url 'invoicing:invoices' %}"
+                    hx-trigger="change"
+                    hx-target="#invoices-table-container"
+                    hx-include="[name='search'],[name='status'],[name='date_from']">
+            </div>
+        </ion-card-content>
+    </ion-card>
+
+    <!-- Invoices Table -->
+    <ion-card class="m-0">
+        <ion-card-content class="p-0">
+            <div id="invoices-table-container">
+                {% include "invoicing/partials/invoices_table.html" %}
+            </div>
+        </ion-card-content>
+    </ion-card>
+</div>

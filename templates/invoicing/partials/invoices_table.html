@@ -1,0 +1,66 @@
+{% load i18n %}
+
+<div class="overflow-x-auto">
+    <table class="w-full">
+        <thead>
+            <tr style="background: var(--ion-color-light);">
+                <th class="p-3 text-left text-sm font-medium">{% trans "Number" %}</th>
+                <th class="p-3 text-left text-sm font-medium">{% trans "Customer" %}</th>
+                <th class="p-3 text-left text-sm font-medium">{% trans "Date" %}</th>
+                <th class="p-3 text-right text-sm font-medium">{% trans "Total" %}</th>
+                <th class="p-3 text-center text-sm font-medium">{% trans "Status" %}</th>
+                <th class="p-3 text-center text-sm font-medium">{% trans "Actions" %}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for invoice in invoices %}
+            <tr style="border-bottom: 1px solid var(--ion-border-color);">
+                <td class="p-3">
+                    <span class="font-medium">{{ invoice.number|default:_("Draft") }}</span>
+                </td>
+                <td class="p-3">
+                    <div>{{ invoice.customer_name }}</div>
+                    {% if invoice.customer_tax_id %}
+                    <div class="text-xs" style="color: var(--ion-color-medium);">{{ invoice.customer_tax_id }}</div>
+                    {% endif %}
+                </td>
+                <td class="p-3">{{ invoice.issue_date|date:"Y-m-d" }}</td>
+                <td class="p-3 text-right font-medium">€{{ invoice.total }}</td>
+                <td class="p-3 text-center">
+                    {% if invoice.status == 'draft' %}
+                    <ion-badge color="medium">{% trans "Draft" %}</ion-badge>
+                    {% elif invoice.status == 'issued' %}
+                    <ion-badge color="primary">{% trans "Issued" %}</ion-badge>
+                    {% elif invoice.status == 'paid' %}
+                    <ion-badge color="success">{% trans "Paid" %}</ion-badge>
+                    {% elif invoice.status == 'cancelled' %}
+                    <ion-badge color="danger">{% trans "Cancelled" %}</ion-badge>
+                    {% endif %}
+                </td>
+                <td class="p-3 text-center">
+                    <ion-button size="small" fill="clear"
+                        hx-get="{% url 'invoicing:invoice_detail' invoice.id %}"
+                        hx-target="#dashboard-content"
+                        hx-push-url="true">
+                        <ion-icon slot="icon-only" name="eye-outline"></ion-icon>
+                    </ion-button>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="6" class="text-center py-12">
+                    <ion-icon name="document-text-outline" style="font-size: 64px; color: var(--ion-color-medium);"></ion-icon>
+                    <p class="mt-4" style="color: var(--ion-color-medium);">{% trans "No invoices found" %}</p>
+                    <ion-button class="mt-4"
+                        hx-get="{% url 'invoicing:invoice_create' %}"
+                        hx-target="#dashboard-content"
+                        hx-push-url="true">
+                        <ion-icon slot="start" name="add-outline"></ion-icon>
+                        {% trans "Create First Invoice" %}
+                    </ion-button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>

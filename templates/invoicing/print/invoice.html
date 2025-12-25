@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+{% load i18n %}
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ invoice.number|default:_("Draft") }}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            font-size: 12px;
+            line-height: 1.4;
+            color: #333;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #333;
+        }
+
+        .company-info h1 {
+            font-size: 24px;
+            margin-bottom: 8px;
+            color: #222;
+        }
+
+        .company-info p {
+            color: #666;
+            margin: 2px 0;
+        }
+
+        .invoice-info {
+            text-align: right;
+        }
+
+        .invoice-info h2 {
+            font-size: 28px;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .invoice-info .number {
+            font-size: 18px;
+            font-weight: bold;
+            color: #000;
+        }
+
+        .invoice-info .date {
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .invoice-info .status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-top: 10px;
+        }
+
+        .status-draft { background: #f0f0f0; color: #666; }
+        .status-issued { background: #e3f2fd; color: #1976d2; }
+        .status-paid { background: #e8f5e9; color: #388e3c; }
+        .status-cancelled { background: #ffebee; color: #d32f2f; }
+
+        .parties {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 30px;
+        }
+
+        .party {
+            width: 48%;
+        }
+
+        .party h3 {
+            font-size: 11px;
+            text-transform: uppercase;
+            color: #666;
+            margin-bottom: 10px;
+            padding-bottom: 5px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .party .name {
+            font-size: 14px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .party p {
+            color: #555;
+            margin: 2px 0;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+
+        th {
+            background: #f5f5f5;
+            padding: 12px;
+            text-align: left;
+            font-size: 11px;
+            text-transform: uppercase;
+            color: #666;
+            border-bottom: 2px solid #ddd;
+        }
+
+        th:nth-child(2), th:nth-child(3), th:nth-child(4), th:nth-child(5) {
+            text-align: right;
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #eee;
+            vertical-align: top;
+        }
+
+        td:nth-child(2), td:nth-child(3), td:nth-child(4), td:nth-child(5) {
+            text-align: right;
+        }
+
+        .description {
+            font-weight: 500;
+        }
+
+        .sku {
+            font-size: 10px;
+            color: #888;
+        }
+
+        .summary {
+            float: right;
+            width: 300px;
+            margin-top: 20px;
+        }
+
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .summary-row.total {
+            font-size: 16px;
+            font-weight: bold;
+            border-bottom: 2px solid #333;
+            border-top: 2px solid #333;
+            margin-top: 10px;
+            padding: 12px 0;
+        }
+
+        .footer {
+            clear: both;
+            margin-top: 60px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            text-align: center;
+            color: #888;
+            font-size: 10px;
+        }
+
+        .notes {
+            clear: both;
+            margin-top: 40px;
+            padding: 15px;
+            background: #f9f9f9;
+            border-radius: 4px;
+        }
+
+        .notes h4 {
+            font-size: 11px;
+            text-transform: uppercase;
+            color: #666;
+            margin-bottom: 8px;
+        }
+
+        @media print {
+            body {
+                padding: 0;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+
+            .no-print {
+                display: none !important;
+            }
+        }
+
+        .print-button {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            background: #333;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .print-button:hover {
+            background: #555;
+        }
+    </style>
+</head>
+<body>
+    <button class="print-button no-print" onclick="window.print()">{% trans "Print" %}</button>
+
+    <div class="header">
+        <div class="company-info">
+            <h1>{{ config.company_name|default:_("Your Company") }}</h1>
+            <p>{{ config.company_tax_id }}</p>
+            <p>{{ config.company_address }}</p>
+            <p>{{ config.company_phone }}</p>
+            <p>{{ config.company_email }}</p>
+        </div>
+        <div class="invoice-info">
+            <h2>{% trans "INVOICE" %}</h2>
+            <div class="number">{{ invoice.number|default:_("DRAFT") }}</div>
+            <div class="date">{{ invoice.issue_date|date:"j F Y" }}</div>
+            <div class="status status-{{ invoice.status }}">{{ invoice.get_status_display }}</div>
+        </div>
+    </div>
+
+    <div class="parties">
+        <div class="party">
+            <h3>{% trans "Bill To" %}</h3>
+            <div class="name">{{ invoice.customer_name }}</div>
+            {% if invoice.customer_tax_id %}
+            <p>{% trans "Tax ID" %}: {{ invoice.customer_tax_id }}</p>
+            {% endif %}
+            {% if invoice.customer_address %}
+            <p>{{ invoice.customer_address }}</p>
+            {% endif %}
+            {% if invoice.customer_email %}
+            <p>{{ invoice.customer_email }}</p>
+            {% endif %}
+            {% if invoice.customer_phone %}
+            <p>{{ invoice.customer_phone }}</p>
+            {% endif %}
+        </div>
+        <div class="party">
+            <h3>{% trans "Invoice Details" %}</h3>
+            <p><strong>{% trans "Series" %}:</strong> {{ invoice.series.prefix }} - {{ invoice.series.name }}</p>
+            <p><strong>{% trans "Issue Date" %}:</strong> {{ invoice.issue_date|date:"Y-m-d" }}</p>
+            {% if invoice.due_date %}
+            <p><strong>{% trans "Due Date" %}:</strong> {{ invoice.due_date|date:"Y-m-d" }}</p>
+            {% endif %}
+            <p><strong>{% trans "Type" %}:</strong> {{ invoice.get_invoice_type_display }}</p>
+        </div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>{% trans "Description" %}</th>
+                <th>{% trans "Qty" %}</th>
+                <th>{% trans "Unit Price" %}</th>
+                <th>{% trans "Discount" %}</th>
+                <th>{% trans "Amount" %}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for line in invoice.lines.all %}
+            <tr>
+                <td>
+                    <div class="description">{{ line.description }}</div>
+                    {% if line.product_sku %}
+                    <div class="sku">{{ line.product_sku }}</div>
+                    {% endif %}
+                </td>
+                <td>{{ line.quantity }}</td>
+                <td>€{{ line.unit_price }}</td>
+                <td>{% if line.discount_percent %}{{ line.discount_percent }}%{% else %}-{% endif %}</td>
+                <td>€{{ line.line_total }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="summary">
+        <div class="summary-row">
+            <span>{% trans "Subtotal" %}</span>
+            <span>€{{ invoice.subtotal }}</span>
+        </div>
+        <div class="summary-row">
+            <span>{% trans "Tax" %} ({{ invoice.tax_rate }}%)</span>
+            <span>€{{ invoice.tax_amount }}</span>
+        </div>
+        <div class="summary-row total">
+            <span>{% trans "Total" %}</span>
+            <span>€{{ invoice.total }}</span>
+        </div>
+    </div>
+
+    {% if invoice.notes %}
+    <div class="notes">
+        <h4>{% trans "Notes" %}</h4>
+        <p>{{ invoice.notes }}</p>
+    </div>
+    {% endif %}
+
+    {% if config.invoice_footer %}
+    <div class="footer">
+        {{ config.invoice_footer }}
+    </div>
+    {% endif %}
+</body>
+</html>

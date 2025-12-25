@@ -1,0 +1,259 @@
+{% load static %}
+{% load i18n %}
+
+{% if request.htmx %}
+<div id="dashboard-tabbar" hx-swap-oob="innerHTML">
+<ion-footer>
+{% include "invoicing/partials/tabbar.html" with current_view='invoices' %}
+</ion-footer>
+</div>
+{% endif %}
+
+{% csrf_token %}
+<div x-data="invoiceDetailApp()" class="ion-padding">
+    <!-- Page Header -->
+    <div class="flex justify-between items-center mb-6">
+        <div class="flex items-center gap-4">
+            <ion-button fill="clear"
+                hx-get="{% url 'invoicing:invoices' %}"
+                hx-target="#dashboard-content"
+                hx-push-url="true">
+                <ion-icon slot="icon-only" name="arrow-back-outline"></ion-icon>
+            </ion-button>
+            <div>
+                <h1 class="text-2xl font-bold" style="color: var(--ion-text-color);">
+                    {{ invoice.number|default:_("Draft Invoice") }}
+                </h1>
+                <ion-badge color="{{ invoice.status|default:'medium' }}" class="mt-1">
+                    {{ invoice.get_status_display }}
+                </ion-badge>
+            </div>
+        </div>
+        <div class="flex gap-2">
+            {% if invoice.status == 'draft' %}
+            <ion-button color="success" @click="issueInvoice()">
+                <ion-icon slot="start" name="checkmark-circle-outline"></ion-icon>
+                {% trans "Issue Invoice" %}
+            </ion-button>
+            {% endif %}
+            {% if invoice.status != 'cancelled' %}
+            <ion-button fill="outline" @click="window.open('{% url 'invoicing:invoice_print' invoice.id %}', '_blank')">
+                <ion-icon slot="start" name="print-outline"></ion-icon>
+                {% trans "Print" %}
+            </ion-button>
+            <ion-button color="danger" fill="outline" @click="cancelInvoice()">
+                <ion-icon slot="start" name="close-circle-outline"></ion-icon>
+                {% trans "Cancel" %}
+            </ion-button>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Main Content -->
+        <div class="lg:col-span-2">
+            <!-- Customer Info -->
+            <ion-card class="m-0 mb-4">
+                <ion-card-header>
+                    <ion-card-title>{% trans "Customer" %}</ion-card-title>
+                </ion-card-header>
+                <ion-card-content>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <div class="text-xs text-medium mb-1">{% trans "Name" %}</div>
+                            <div class="font-medium">{{ invoice.customer_name }}</div>
+                        </div>
+                        <div>
+                            <div class="text-xs text-medium mb-1">{% trans "Tax ID" %}</div>
+                            <div class="font-medium">{{ invoice.customer_tax_id|default:"-" }}</div>
+                        </div>
+                        <div class="col-span-2">
+                            <div class="text-xs text-medium mb-1">{% trans "Address" %}</div>
+                            <div>{{ invoice.customer_address|default:"-" }}</div>
+                        </div>
+                    </div>
+                </ion-card-content>
+            </ion-card>
+
+            <!-- Invoice Lines -->
+            <ion-card class="m-0">
+                <ion-card-header>
+                    <ion-card-title>{% trans "Items" %}</ion-card-title>
+                </ion-card-header>
+                <ion-card-content class="p-0">
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead>
+                                <tr style="background: var(--ion-color-light);">
+                                    <th class="p-3 text-left text-sm font-medium">{% trans "Description" %}</th>
+                                    <th class="p-3 text-right text-sm font-medium">{% trans "Qty" %}</th>
+                                    <th class="p-3 text-right text-sm font-medium">{% trans "Price" %}</th>
+                                    <th class="p-3 text-right text-sm font-medium">{% trans "Discount" %}</th>
+                                    <th class="p-3 text-right text-sm font-medium">{% trans "Total" %}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for line in invoice.lines.all %}
+                                <tr style="border-bottom: 1px solid var(--ion-border-color);">
+                                    <td class="p-3">
+                                        <div class="font-medium">{{ line.description }}</div>
+                                        {% if line.product_sku %}
+                                        <div class="text-xs text-medium">{{ line.product_sku }}</div>
+                                        {% endif %}
+                                    </td>
+                                    <td class="p-3 text-right">{{ line.quantity }}</td>
+                                    <td class="p-3 text-right">€{{ line.unit_price }}</td>
+                                    <td class="p-3 text-right">
+                                        {% if line.discount_percent %}{{ line.discount_percent }}%{% else %}-{% endif %}
+                                    </td>
+                                    <td class="p-3 text-right font-medium">€{{ line.line_total }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="5" class="p-6 text-center text-medium">
+                                        {% trans "No items" %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </ion-card-content>
+            </ion-card>
+        </div>
+
+        <!-- Summary Sidebar -->
+        <div>
+            <ion-card class="m-0 mb-4">
+                <ion-card-header>
+                    <ion-card-title>{% trans "Summary" %}</ion-card-title>
+                </ion-card-header>
+                <ion-card-content>
+                    <div class="space-y-3">
+                        <div class="flex justify-between">
+                            <span class="text-medium">{% trans "Subtotal" %}</span>
+                            <span>€{{ invoice.subtotal }}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-medium">{% trans "Tax" %} ({{ invoice.tax_rate }}%)</span>
+                            <span>€{{ invoice.tax_amount }}</span>
+                        </div>
+                        <div style="height: 1px; background: var(--ion-border-color);"></div>
+                        <div class="flex justify-between text-lg font-bold">
+                            <span>{% trans "Total" %}</span>
+                            <span>€{{ invoice.total }}</span>
+                        </div>
+                    </div>
+                </ion-card-content>
+            </ion-card>
+
+            <ion-card class="m-0">
+                <ion-card-header>
+                    <ion-card-title>{% trans "Details" %}</ion-card-title>
+                </ion-card-header>
+                <ion-card-content>
+                    <div class="space-y-3">
+                        <div>
+                            <div class="text-xs text-medium mb-1">{% trans "Series" %}</div>
+                            <div>{{ invoice.series.prefix }} - {{ invoice.series.name }}</div>
+                        </div>
+                        <div>
+                            <div class="text-xs text-medium mb-1">{% trans "Issue Date" %}</div>
+                            <div>{{ invoice.issue_date|date:"Y-m-d" }}</div>
+                        </div>
+                        <div>
+                            <div class="text-xs text-medium mb-1">{% trans "Due Date" %}</div>
+                            <div>{{ invoice.due_date|date:"Y-m-d"|default:"-" }}</div>
+                        </div>
+                        <div>
+                            <div class="text-xs text-medium mb-1">{% trans "Type" %}</div>
+                            <div>{{ invoice.get_invoice_type_display }}</div>
+                        </div>
+                    </div>
+                </ion-card-content>
+            </ion-card>
+
+            {% if invoice.notes %}
+            <ion-card class="m-0 mt-4">
+                <ion-card-header>
+                    <ion-card-title>{% trans "Notes" %}</ion-card-title>
+                </ion-card-header>
+                <ion-card-content>
+                    {{ invoice.notes }}
+                </ion-card-content>
+            </ion-card>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+// Register globally for HTMX compatibility
+window.invoiceDetailApp = function() {
+    return {
+        async issueInvoice() {
+            if (!confirm('{% trans "Issue this invoice? This action cannot be undone." %}')) return;
+
+            try {
+                const response = await fetch('{% url "invoicing:invoice_issue" invoice.id %}', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                    }
+                });
+                const data = await response.json();
+                if (data.success) {
+                    this.showToast(data.message, 'success');
+                    setTimeout(() => htmx.ajax('GET', '{% url "invoicing:invoice_detail" invoice.id %}', {target: '#dashboard-content'}), 1000);
+                } else {
+                    this.showToast(data.error, 'danger');
+                }
+            } catch (error) {
+                this.showToast('{% trans "Error issuing invoice" %}', 'danger');
+            }
+        },
+
+        async cancelInvoice() {
+            if (!confirm('{% trans "Cancel this invoice? This action cannot be undone." %}')) return;
+
+            try {
+                const response = await fetch('{% url "invoicing:invoice_cancel" invoice.id %}', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                    }
+                });
+                const data = await response.json();
+                if (data.success) {
+                    this.showToast(data.message, 'warning');
+                    setTimeout(() => htmx.ajax('GET', '{% url "invoicing:invoice_detail" invoice.id %}', {target: '#dashboard-content'}), 1000);
+                } else {
+                    this.showToast(data.error, 'danger');
+                }
+            } catch (error) {
+                this.showToast('{% trans "Error cancelling invoice" %}', 'danger');
+            }
+        },
+
+        async showToast(message, color = 'primary') {
+            const toast = document.createElement('ion-toast');
+            toast.message = message;
+            toast.duration = 2000;
+            toast.color = color;
+            toast.position = 'top';
+            document.body.appendChild(toast);
+            await toast.present();
+        }
+    }
+};
+
+// Re-initialize Alpine after HTMX swap
+document.addEventListener('htmx:afterSwap', function(event) {
+    if (event.detail.target.id === 'dashboard-content') {
+        const alpineEl = event.detail.target.querySelector('[x-data]');
+        if (alpineEl && !alpineEl._x_dataStack) {
+            Alpine.initTree(alpineEl);
+        }
+    }
+});
+</script>

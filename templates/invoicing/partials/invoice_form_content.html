@@ -1,0 +1,353 @@
+{% load static %}
+{% load i18n %}
+
+{% if request.htmx %}
+<div id="dashboard-tabbar" hx-swap-oob="innerHTML">
+<ion-footer>
+{% include "invoicing/partials/tabbar.html" with current_view='invoices' %}
+</ion-footer>
+</div>
+{% endif %}
+
+{% csrf_token %}
+<div x-data="invoiceFormApp()" class="ion-padding">
+    <!-- Page Header -->
+    <div class="flex justify-between items-center mb-6">
+        <div class="flex items-center gap-4">
+            <ion-button fill="clear"
+                hx-get="{% url 'invoicing:invoices' %}"
+                hx-target="#dashboard-content"
+                hx-push-url="true">
+                <ion-icon slot="icon-only" name="arrow-back-outline"></ion-icon>
+            </ion-button>
+            <div>
+                <h1 class="text-2xl font-bold" style="color: var(--ion-text-color);">{% trans "New Invoice" %}</h1>
+                <p class="text-sm mt-1" style="color: var(--ion-color-medium);">{% trans "Create a new invoice" %}</p>
+            </div>
+        </div>
+        <div class="flex gap-2">
+            <ion-button color="medium" fill="outline"
+                hx-get="{% url 'invoicing:invoices' %}"
+                hx-target="#dashboard-content"
+                hx-push-url="true">
+                {% trans "Cancel" %}
+            </ion-button>
+            <ion-button @click="saveInvoice()">
+                <ion-icon slot="start" name="save-outline"></ion-icon>
+                {% trans "Save Draft" %}
+            </ion-button>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Main Form -->
+        <div class="lg:col-span-2">
+            <!-- Customer Info -->
+            <ion-card class="m-0 mb-4">
+                <ion-card-header>
+                    <ion-card-title>{% trans "Customer Information" %}</ion-card-title>
+                </ion-card-header>
+                <ion-card-content>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <ion-item>
+                            <ion-input
+                                label="{% trans 'Customer Name' %} *"
+                                label-placement="stacked"
+                                x-model="invoice.customer_name"
+                                required>
+                            </ion-input>
+                        </ion-item>
+                        <ion-item>
+                            <ion-input
+                                label="{% trans 'Tax ID (NIF/CIF)' %}"
+                                label-placement="stacked"
+                                x-model="invoice.customer_tax_id">
+                            </ion-input>
+                        </ion-item>
+                        <ion-item class="md:col-span-2">
+                            <ion-textarea
+                                label="{% trans 'Address' %}"
+                                label-placement="stacked"
+                                rows="2"
+                                x-model="invoice.customer_address">
+                            </ion-textarea>
+                        </ion-item>
+                        <ion-item>
+                            <ion-input
+                                label="{% trans 'Email' %}"
+                                label-placement="stacked"
+                                type="email"
+                                x-model="invoice.customer_email">
+                            </ion-input>
+                        </ion-item>
+                        <ion-item>
+                            <ion-input
+                                label="{% trans 'Phone' %}"
+                                label-placement="stacked"
+                                type="tel"
+                                x-model="invoice.customer_phone">
+                            </ion-input>
+                        </ion-item>
+                    </div>
+                </ion-card-content>
+            </ion-card>
+
+            <!-- Invoice Lines -->
+            <ion-card class="m-0">
+                <ion-card-header>
+                    <div class="flex justify-between items-center">
+                        <ion-card-title>{% trans "Items" %}</ion-card-title>
+                        <ion-button size="small" @click="addLine()">
+                            <ion-icon slot="start" name="add-outline"></ion-icon>
+                            {% trans "Add Item" %}
+                        </ion-button>
+                    </div>
+                </ion-card-header>
+                <ion-card-content class="p-0">
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead>
+                                <tr style="background: var(--ion-color-light);">
+                                    <th class="p-3 text-left text-sm font-medium" style="min-width: 200px;">{% trans "Description" %}</th>
+                                    <th class="p-3 text-right text-sm font-medium" style="width: 80px;">{% trans "Qty" %}</th>
+                                    <th class="p-3 text-right text-sm font-medium" style="width: 100px;">{% trans "Price" %}</th>
+                                    <th class="p-3 text-right text-sm font-medium" style="width: 80px;">{% trans "Disc.%" %}</th>
+                                    <th class="p-3 text-right text-sm font-medium" style="width: 100px;">{% trans "Total" %}</th>
+                                    <th class="p-3 text-center" style="width: 50px;"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template x-for="(line, index) in invoice.lines" :key="index">
+                                    <tr style="border-bottom: 1px solid var(--ion-border-color);">
+                                        <td class="p-2">
+                                            <ion-input
+                                                x-model="line.description"
+                                                placeholder="{% trans 'Description' %}"
+                                                class="text-sm">
+                                            </ion-input>
+                                        </td>
+                                        <td class="p-2">
+                                            <ion-input
+                                                type="number"
+                                                x-model.number="line.quantity"
+                                                min="1"
+                                                step="1"
+                                                class="text-sm text-right"
+                                                @ionChange="calculateTotals()">
+                                            </ion-input>
+                                        </td>
+                                        <td class="p-2">
+                                            <ion-input
+                                                type="number"
+                                                x-model.number="line.unit_price"
+                                                min="0"
+                                                step="0.01"
+                                                class="text-sm text-right"
+                                                @ionChange="calculateTotals()">
+                                            </ion-input>
+                                        </td>
+                                        <td class="p-2">
+                                            <ion-input
+                                                type="number"
+                                                x-model.number="line.discount"
+                                                min="0"
+                                                max="100"
+                                                step="1"
+                                                class="text-sm text-right"
+                                                @ionChange="calculateTotals()">
+                                            </ion-input>
+                                        </td>
+                                        <td class="p-2 text-right font-medium">
+                                            €<span x-text="getLineTotal(line).toFixed(2)"></span>
+                                        </td>
+                                        <td class="p-2 text-center">
+                                            <ion-button fill="clear" color="danger" size="small" @click="removeLine(index)">
+                                                <ion-icon slot="icon-only" name="trash-outline"></ion-icon>
+                                            </ion-button>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Empty State -->
+                    <div x-show="invoice.lines.length === 0" class="text-center py-8">
+                        <ion-icon name="document-text-outline" style="font-size: 48px; color: var(--ion-color-medium);"></ion-icon>
+                        <p class="mt-2" style="color: var(--ion-color-medium);">{% trans "No items added" %}</p>
+                        <ion-button class="mt-4" size="small" @click="addLine()">
+                            <ion-icon slot="start" name="add-outline"></ion-icon>
+                            {% trans "Add First Item" %}
+                        </ion-button>
+                    </div>
+                </ion-card-content>
+            </ion-card>
+        </div>
+
+        <!-- Summary Sidebar -->
+        <div>
+            <ion-card class="m-0 mb-4">
+                <ion-card-header>
+                    <ion-card-title>{% trans "Summary" %}</ion-card-title>
+                </ion-card-header>
+                <ion-card-content>
+                    <div class="space-y-3">
+                        <div class="flex justify-between">
+                            <span class="text-medium">{% trans "Subtotal" %}</span>
+                            <span>€<span x-text="totals.subtotal.toFixed(2)"></span></span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-medium">{% trans "Tax" %}</span>
+                            <div class="flex items-center gap-2">
+                                <ion-input
+                                    type="number"
+                                    x-model.number="invoice.tax_rate"
+                                    min="0"
+                                    max="100"
+                                    step="1"
+                                    style="width: 60px;"
+                                    class="text-right"
+                                    @ionChange="calculateTotals()">
+                                </ion-input>
+                                <span>%</span>
+                            </div>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-medium">{% trans "Tax Amount" %}</span>
+                            <span>€<span x-text="totals.tax.toFixed(2)"></span></span>
+                        </div>
+                        <div style="height: 1px; background: var(--ion-border-color);"></div>
+                        <div class="flex justify-between text-lg font-bold">
+                            <span>{% trans "Total" %}</span>
+                            <span>€<span x-text="totals.total.toFixed(2)"></span></span>
+                        </div>
+                    </div>
+                </ion-card-content>
+            </ion-card>
+
+            <ion-card class="m-0">
+                <ion-card-header>
+                    <ion-card-title>{% trans "Notes" %}</ion-card-title>
+                </ion-card-header>
+                <ion-card-content>
+                    <ion-textarea
+                        rows="4"
+                        placeholder="{% trans 'Optional notes for the invoice...' %}"
+                        x-model="invoice.notes">
+                    </ion-textarea>
+                </ion-card-content>
+            </ion-card>
+        </div>
+    </div>
+</div>
+
+<script>
+// Register globally so HTMX can find it after swap
+window.invoiceFormApp = function() {
+    return {
+        invoice: {
+            customer_name: '',
+            customer_tax_id: '',
+            customer_address: '',
+            customer_email: '',
+            customer_phone: '',
+            tax_rate: {{ config.default_tax_rate|default:21 }},
+            notes: '',
+            lines: []
+        },
+        totals: {
+            subtotal: 0,
+            tax: 0,
+            total: 0
+        },
+
+        init() {
+            this.addLine();
+        },
+
+        addLine() {
+            this.invoice.lines.push({
+                description: '',
+                quantity: 1,
+                unit_price: 0,
+                discount: 0,
+                tax_rate: this.invoice.tax_rate
+            });
+        },
+
+        removeLine(index) {
+            this.invoice.lines.splice(index, 1);
+            this.calculateTotals();
+        },
+
+        getLineTotal(line) {
+            const subtotal = line.quantity * line.unit_price;
+            const discount = subtotal * (line.discount / 100);
+            return subtotal - discount;
+        },
+
+        calculateTotals() {
+            this.totals.subtotal = this.invoice.lines.reduce((sum, line) => {
+                return sum + this.getLineTotal(line);
+            }, 0);
+            this.totals.tax = this.totals.subtotal * (this.invoice.tax_rate / 100);
+            this.totals.total = this.totals.subtotal + this.totals.tax;
+        },
+
+        async saveInvoice() {
+            if (!this.invoice.customer_name) {
+                this.showToast('{% trans "Customer name is required" %}', 'warning');
+                return;
+            }
+
+            if (this.invoice.lines.length === 0 || !this.invoice.lines.some(l => l.description)) {
+                this.showToast('{% trans "At least one item is required" %}', 'warning');
+                return;
+            }
+
+            try {
+                const response = await fetch('{% url "invoicing:invoice_create" %}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                    },
+                    body: JSON.stringify(this.invoice)
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    this.showToast(data.message, 'success');
+                    setTimeout(() => {
+                        htmx.ajax('GET', '/modules/invoicing/invoices/' + data.invoice_id + '/', {target: '#dashboard-content'});
+                    }, 500);
+                } else {
+                    this.showToast(data.error, 'danger');
+                }
+            } catch (error) {
+                this.showToast('{% trans "Error saving invoice" %}', 'danger');
+            }
+        },
+
+        async showToast(message, color = 'primary') {
+            const toast = document.createElement('ion-toast');
+            toast.message = message;
+            toast.duration = 2000;
+            toast.color = color;
+            toast.position = 'top';
+            document.body.appendChild(toast);
+            await toast.present();
+        }
+    }
+};
+
+// Re-initialize Alpine on this element after HTMX swap
+document.addEventListener('htmx:afterSwap', function(event) {
+    if (event.detail.target.id === 'dashboard-content') {
+        const alpineEl = event.detail.target.querySelector('[x-data]');
+        if (alpineEl && !alpineEl._x_dataStack) {
+            Alpine.initTree(alpineEl);
+        }
+    }
+});
+</script>
