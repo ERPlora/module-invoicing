@@ -1,0 +1,257 @@
+# English translations for Invoicing module.
+# Copyright (C) 2025 ERPlora
+# This file is distributed under the same license as the ERPlora package.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: ERPlora Invoicing 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2025-12-25 00:00+0000\n"
+"PO-Revision-Date: 2025-12-25 00:00+0000\n"
+"Last-Translator: ERPlora Team\n"
+"Language-Team: English\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+# InvoicingConfig model
+msgid "Company Name"
+msgstr "Company Name"
+
+msgid "Tax ID (NIF/CIF)"
+msgstr "Tax ID (NIF/CIF)"
+
+msgid "Address"
+msgstr "Address"
+
+msgid "Phone"
+msgstr "Phone"
+
+msgid "Email"
+msgstr "Email"
+
+msgid "Default Series"
+msgstr "Default Series"
+
+msgid "Auto-generate on Sale"
+msgstr "Auto-generate on Sale"
+
+msgid "Require Customer"
+msgstr "Require Customer"
+
+msgid "Invoice Footer"
+msgstr "Invoice Footer"
+
+msgid "Text to show at the bottom of invoices"
+msgstr "Text to show at the bottom of invoices"
+
+msgid "Invoicing Configuration"
+msgstr "Invoicing Configuration"
+
+# InvoiceSeries model
+msgid "Prefix"
+msgstr "Prefix"
+
+msgid "Name"
+msgstr "Name"
+
+msgid "Description"
+msgstr "Description"
+
+msgid "Next Number"
+msgstr "Next Number"
+
+msgid "Active"
+msgstr "Active"
+
+msgid "Number Digits"
+msgstr "Number Digits"
+
+msgid "Invoice Series"
+msgstr "Invoice Series"
+
+# Invoice model - Status
+msgid "Draft"
+msgstr "Draft"
+
+msgid "Issued"
+msgstr "Issued"
+
+msgid "Paid"
+msgstr "Paid"
+
+msgid "Cancelled"
+msgstr "Cancelled"
+
+# Invoice model - Type
+msgid "Invoice"
+msgstr "Invoice"
+
+msgid "Simplified Invoice"
+msgstr "Simplified Invoice"
+
+msgid "Rectifying Invoice"
+msgstr "Rectifying Invoice"
+
+# Invoice model - Fields
+msgid "Series"
+msgstr "Series"
+
+msgid "Invoice Number"
+msgstr "Invoice Number"
+
+msgid "Type"
+msgstr "Type"
+
+msgid "Status"
+msgstr "Status"
+
+msgid "Issue Date"
+msgstr "Issue Date"
+
+msgid "Due Date"
+msgstr "Due Date"
+
+msgid "Customer Name"
+msgstr "Customer Name"
+
+msgid "Customer Tax ID"
+msgstr "Customer Tax ID"
+
+msgid "Customer Address"
+msgstr "Customer Address"
+
+msgid "Customer Email"
+msgstr "Customer Email"
+
+msgid "Customer Phone"
+msgstr "Customer Phone"
+
+msgid "Customer ID"
+msgstr "Customer ID"
+
+msgid "Sale ID"
+msgstr "Sale ID"
+
+msgid "Subtotal"
+msgstr "Subtotal"
+
+msgid "Tax Rate %"
+msgstr "Tax Rate %"
+
+msgid "Tax Amount"
+msgstr "Tax Amount"
+
+msgid "Total"
+msgstr "Total"
+
+msgid "Payment Method"
+msgstr "Payment Method"
+
+msgid "Paid Amount"
+msgstr "Paid Amount"
+
+msgid "Paid At"
+msgstr "Paid At"
+
+msgid "Notes"
+msgstr "Notes"
+
+msgid "Rectified Invoice"
+msgstr "Rectified Invoice"
+
+msgid "Invoices"
+msgstr "Invoices"
+
+# InvoiceLine model
+msgid "Product ID"
+msgstr "Product ID"
+
+msgid "SKU"
+msgstr "SKU"
+
+msgid "Quantity"
+msgstr "Quantity"
+
+msgid "Unit Price"
+msgstr "Unit Price"
+
+msgid "Discount %"
+msgstr "Discount %"
+
+msgid "Line Total"
+msgstr "Line Total"
+
+msgid "Order"
+msgstr "Order"
+
+msgid "Invoice Line"
+msgstr "Invoice Line"
+
+msgid "Invoice Lines"
+msgstr "Invoice Lines"
+
+# Views messages
+msgid "Facturación"
+msgstr "Invoicing"
+
+msgid "Facturas"
+msgstr "Invoices"
+
+msgid "Borrador"
+msgstr "Draft"
+
+msgid "Factura"
+msgstr "Invoice"
+
+msgid "Nueva Factura"
+msgstr "New Invoice"
+
+msgid "Factura creada correctamente"
+msgstr "Invoice created successfully"
+
+msgid "Solo se pueden emitir facturas en borrador"
+msgstr "Only draft invoices can be issued"
+
+msgid "Factura emitida correctamente"
+msgstr "Invoice issued successfully"
+
+msgid "La factura ya está anulada"
+msgstr "Invoice is already cancelled"
+
+msgid "Factura anulada correctamente"
+msgstr "Invoice cancelled successfully"
+
+msgid "Series de Facturación"
+msgstr "Invoice Series"
+
+msgid "Nueva Serie"
+msgstr "New Series"
+
+msgid "Prefijo y nombre son obligatorios"
+msgstr "Prefix and name are required"
+
+msgid "Ya existe una serie con ese prefijo"
+msgstr "A series with this prefix already exists"
+
+msgid "Serie creada correctamente"
+msgstr "Series created successfully"
+
+msgid "Editar Serie"
+msgstr "Edit Series"
+
+msgid "Serie actualizada correctamente"
+msgstr "Series updated successfully"
+
+msgid "No se puede eliminar: hay facturas con esta serie"
+msgstr "Cannot delete: there are invoices with this series"
+
+msgid "Serie eliminada correctamente"
+msgstr "Series deleted successfully"
+
+msgid "Configuración"
+msgstr "Settings"
+
+msgid "Configuración guardada correctamente"
+msgstr "Settings saved successfully"

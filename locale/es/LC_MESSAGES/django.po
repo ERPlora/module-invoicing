@@ -1,0 +1,258 @@
+# Spanish translations for Invoicing module.
+# Copyright (C) 2025 ERPlora
+# This file is distributed under the same license as the ERPlora package.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: ERPlora Invoicing 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2025-12-25 00:00+0000\n"
+"PO-Revision-Date: 2025-12-25 00:00+0000\n"
+"Last-Translator: ERPlora Team\n"
+"Language-Team: Spanish\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+# InvoicingConfig model
+msgid "Company Name"
+msgstr "Nombre de la empresa"
+
+msgid "Tax ID (NIF/CIF)"
+msgstr "NIF/CIF"
+
+msgid "Address"
+msgstr "Dirección"
+
+msgid "Phone"
+msgstr "Teléfono"
+
+msgid "Email"
+msgstr "Correo electrónico"
+
+msgid "Default Series"
+msgstr "Serie por defecto"
+
+msgid "Auto-generate on Sale"
+msgstr "Generar automáticamente en ventas"
+
+msgid "Require Customer"
+msgstr "Requiere cliente"
+
+msgid "Invoice Footer"
+msgstr "Pie de factura"
+
+msgid "Text to show at the bottom of invoices"
+msgstr "Texto a mostrar en el pie de las facturas"
+
+msgid "Invoicing Configuration"
+msgstr "Configuración de facturación"
+
+# InvoiceSeries model
+msgid "Prefix"
+msgstr "Prefijo"
+
+msgid "Name"
+msgstr "Nombre"
+
+msgid "Description"
+msgstr "Descripción"
+
+msgid "Next Number"
+msgstr "Siguiente número"
+
+msgid "Active"
+msgstr "Activo"
+
+msgid "Number Digits"
+msgstr "Dígitos del número"
+
+msgid "Invoice Series"
+msgstr "Series de facturación"
+
+# Invoice model - Status
+msgid "Draft"
+msgstr "Borrador"
+
+msgid "Issued"
+msgstr "Emitida"
+
+msgid "Paid"
+msgstr "Pagada"
+
+msgid "Cancelled"
+msgstr "Anulada"
+
+# Invoice model - Type
+msgid "Invoice"
+msgstr "Factura"
+
+msgid "Simplified Invoice"
+msgstr "Factura simplificada"
+
+msgid "Rectifying Invoice"
+msgstr "Factura rectificativa"
+
+# Invoice model - Fields
+msgid "Series"
+msgstr "Serie"
+
+msgid "Invoice Number"
+msgstr "Número de factura"
+
+msgid "Type"
+msgstr "Tipo"
+
+msgid "Status"
+msgstr "Estado"
+
+msgid "Issue Date"
+msgstr "Fecha de emisión"
+
+msgid "Due Date"
+msgstr "Fecha de vencimiento"
+
+msgid "Customer Name"
+msgstr "Nombre del cliente"
+
+msgid "Customer Tax ID"
+msgstr "NIF del cliente"
+
+msgid "Customer Address"
+msgstr "Dirección del cliente"
+
+msgid "Customer Email"
+msgstr "Email del cliente"
+
+msgid "Customer Phone"
+msgstr "Teléfono del cliente"
+
+msgid "Customer ID"
+msgstr "ID del cliente"
+
+msgid "Sale ID"
+msgstr "ID de venta"
+
+msgid "Subtotal"
+msgstr "Subtotal"
+
+msgid "Tax Rate %"
+msgstr "Tipo de IVA %"
+
+msgid "Tax Amount"
+msgstr "Importe de IVA"
+
+msgid "Total"
+msgstr "Total"
+
+msgid "Payment Method"
+msgstr "Método de pago"
+
+msgid "Paid Amount"
+msgstr "Importe pagado"
+
+msgid "Paid At"
+msgstr "Pagada el"
+
+msgid "Notes"
+msgstr "Notas"
+
+msgid "Rectified Invoice"
+msgstr "Factura rectificada"
+
+msgid "Invoices"
+msgstr "Facturas"
+
+# InvoiceLine model
+msgid "Product ID"
+msgstr "ID del producto"
+
+msgid "SKU"
+msgstr "SKU"
+
+msgid "Quantity"
+msgstr "Cantidad"
+
+msgid "Unit Price"
+msgstr "Precio unitario"
+
+msgid "Discount %"
+msgstr "Descuento %"
+
+msgid "Line Total"
+msgstr "Total línea"
+
+msgid "Order"
+msgstr "Orden"
+
+msgid "Invoice Line"
+msgstr "Línea de factura"
+
+msgid "Invoice Lines"
+msgstr "Líneas de factura"
+
+# Views messages
+msgid "Facturación"
+msgstr "Facturación"
+
+msgid "Facturas"
+msgstr "Facturas"
+
+msgid "Borrador"
+msgstr "Borrador"
+
+msgid "Factura"
+msgstr "Factura"
+
+msgid "Nueva Factura"
+msgstr "Nueva Factura"
+
+msgid "Factura creada correctamente"
+msgstr "Factura creada correctamente"
+
+msgid "Solo se pueden emitir facturas en borrador"
+msgstr "Solo se pueden emitir facturas en borrador"
+
+msgid "Factura emitida correctamente"
+msgstr "Factura emitida correctamente"
+
+msgid "La factura ya está anulada"
+msgstr "La factura ya está anulada"
+
+msgid "Factura anulada correctamente"
+msgstr "Factura anulada correctamente"
+
+msgid "Series de Facturación"
+msgstr "Series de Facturación"
+
+msgid "Nueva Serie"
+msgstr "Nueva Serie"
+
+msgid "Prefijo y nombre son obligatorios"
+msgstr "Prefijo y nombre son obligatorios"
+
+msgid "Ya existe una serie con ese prefijo"
+msgstr "Ya existe una serie con ese prefijo"
+
+msgid "Serie creada correctamente"
+msgstr "Serie creada correctamente"
+
+msgid "Editar Serie"
+msgstr "Editar Serie"
+
+msgid "Serie actualizada correctamente"
+msgstr "Serie actualizada correctamente"
+
+msgid "No se puede eliminar: hay facturas con esta serie"
+msgstr "No se puede eliminar: hay facturas con esta serie"
+
+msgid "Serie eliminada correctamente"
+msgstr "Serie eliminada correctamente"
+
+msgid "Configuración"
+msgstr "Configuración"
+
+msgid "Configuración guardada correctamente"
+msgstr "Configuración guardada correctamente"
