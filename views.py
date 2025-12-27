@@ -7,6 +7,7 @@ from django.utils import timezone
 from decimal import Decimal
 import json
 
+from apps.core.htmx import htmx_view
 from .models import Invoice, InvoiceLine, InvoiceSeries, InvoicingConfig
 
 
@@ -15,6 +16,7 @@ from .models import Invoice, InvoiceLine, InvoiceSeries, InvoicingConfig
 # =============================================================================
 
 @require_http_methods(["GET"])
+@htmx_view('invoicing/pages/dashboard.html', 'invoicing/partials/dashboard_content.html')
 def dashboard(request):
     """
     Main invoicing dashboard with stats.
@@ -37,18 +39,13 @@ def dashboard(request):
         status=Invoice.Status.ISSUED
     ).aggregate(total=Sum('total'))['total'] or Decimal('0')
 
-    context = {
+    return {
         'page_title': _('Facturación'),
         'total_invoices': total_invoices,
         'month_invoices': month_invoices,
         'month_total': month_total,
         'pending_amount': pending_amount,
     }
-
-    if request.headers.get('HX-Request'):
-        return render(request, 'invoicing/partials/dashboard_content.html', context)
-
-    return render(request, 'invoicing/pages/dashboard.html', context)
 
 
 # =============================================================================
@@ -59,6 +56,9 @@ def dashboard(request):
 def invoices_list(request):
     """
     List all invoices with filters.
+
+    Note: This view has special HTMX handling for table-only updates,
+    so we don't use @htmx_view decorator here.
     """
     search = request.GET.get('search', '').strip()
     status_filter = request.GET.get('status', '')
@@ -91,11 +91,14 @@ def invoices_list(request):
         'invoices': invoices,
     }
 
-    # HTMX partial for table only
+    # HTMX partial for table only (filters use this target)
     if request.headers.get('HX-Target') == 'invoices-table-container':
         return render(request, 'invoicing/partials/invoices_table.html', context)
 
-    if request.headers.get('HX-Request'):
+    # Check if partial requested via HTMX or ?partial=true query param
+    is_partial = request.headers.get('HX-Request') or request.GET.get('partial') == 'true'
+
+    if is_partial:
         return render(request, 'invoicing/partials/invoices_content.html', context)
 
     return render(request, 'invoicing/pages/invoices.html', context)
@@ -151,21 +154,34 @@ def invoices_list_ajax(request):
 
 
 @require_http_methods(["GET"])
+@htmx_view('invoicing/pages/invoice_detail.html', 'invoicing/partials/invoice_detail_content.html')
 def invoice_detail(request, invoice_id):
     """
     View invoice details.
     """
     invoice = get_object_or_404(Invoice.objects.prefetch_related('lines'), id=invoice_id)
 
-    context = {
+    return {
         'invoice': invoice,
         'page_title': f'{_("Factura")}: {invoice.number or _("Borrador")}',
     }
 
-    if request.headers.get('HX-Request'):
-        return render(request, 'invoicing/partials/invoice_detail_content.html', context)
 
-    return render(request, 'invoicing/pages/invoice_detail.html', context)
+@htmx_view('invoicing/pages/invoice_form.html', 'invoicing/partials/invoice_form_content.html')
+def _invoice_form_view(request, series=None, invoice=None):
+    """
+    Helper view for invoice form (create/edit).
+    """
+    series_list = InvoiceSeries.objects.filter(is_active=True)
+    config = InvoicingConfig.get_config()
+
+    return {
+        'page_title': _('Nueva Factura') if not invoice else f'{_("Editar Factura")}: {invoice.number or _("Borrador")}',
+        'series_list': series_list,
+        'config': config,
+        'series': series,
+        'invoice': invoice,
+    }
 
 
 @require_http_methods(["GET", "POST"])
@@ -231,19 +247,7 @@ def invoice_create(request):
             return JsonResponse({'success': False, 'error': str(e)})
 
     # GET - show form
-    series_list = InvoiceSeries.objects.filter(is_active=True)
-    config = InvoicingConfig.get_config()
-
-    context = {
-        'page_title': _('Nueva Factura'),
-        'series_list': series_list,
-        'config': config,
-    }
-
-    if request.headers.get('HX-Request'):
-        return render(request, 'invoicing/partials/invoice_form_content.html', context)
-
-    return render(request, 'invoicing/pages/invoice_form.html', context)
+    return _invoice_form_view(request)
 
 
 @require_http_methods(["POST"])
@@ -323,21 +327,28 @@ def invoice_print(request, invoice_id):
 # =============================================================================
 
 @require_http_methods(["GET"])
+@htmx_view('invoicing/pages/series.html', 'invoicing/partials/series_content.html')
 def series_list(request):
     """
     List invoice series.
     """
     series = InvoiceSeries.objects.all()
 
-    context = {
+    return {
         'page_title': _('Series de Facturación'),
         'series_list': series,
     }
 
-    if request.headers.get('HX-Request'):
-        return render(request, 'invoicing/partials/series_content.html', context)
 
-    return render(request, 'invoicing/pages/series.html', context)
+@htmx_view('invoicing/pages/series_form.html', 'invoicing/partials/series_form_content.html')
+def _series_form_view(request, series=None):
+    """
+    Helper view for series form (create/edit).
+    """
+    return {
+        'page_title': _('Nueva Serie') if not series else f'{_("Editar Serie")}: {series.prefix}',
+        'series': series,
+    }
 
 
 @require_http_methods(["GET", "POST"])
@@ -381,14 +392,8 @@ def series_create(request):
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)})
 
-    context = {
-        'page_title': _('Nueva Serie'),
-    }
-
-    if request.headers.get('HX-Request'):
-        return render(request, 'invoicing/partials/series_form_content.html', context)
-
-    return render(request, 'invoicing/pages/series_form.html', context)
+    # GET - show form
+    return _series_form_view(request)
 
 
 @require_http_methods(["GET", "POST"])
@@ -415,15 +420,8 @@ def series_edit(request, series_id):
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)})
 
-    context = {
-        'page_title': f'{_("Editar Serie")}: {series.prefix}',
-        'series': series,
-    }
-
-    if request.headers.get('HX-Request'):
-        return render(request, 'invoicing/partials/series_form_content.html', context)
-
-    return render(request, 'invoicing/pages/series_form.html', context)
+    # GET - show form
+    return _series_form_view(request, series=series)
 
 
 @require_http_methods(["POST"])
@@ -456,6 +454,7 @@ def series_delete(request, series_id):
 # =============================================================================
 
 @require_http_methods(["GET", "POST"])
+@htmx_view('invoicing/pages/settings.html', 'invoicing/partials/settings_content.html')
 def settings_view(request):
     """
     Invoicing module settings.
@@ -483,15 +482,11 @@ def settings_view(request):
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)})
 
+    # GET - show settings form
     series_list = InvoiceSeries.objects.filter(is_active=True)
 
-    context = {
+    return {
         'page_title': _('Configuración'),
         'config': config,
         'series_list': series_list,
     }
-
-    if request.headers.get('HX-Request'):
-        return render(request, 'invoicing/partials/settings_content.html', context)
-
-    return render(request, 'invoicing/pages/settings.html', context)

@@ -1,13 +1,12 @@
 {% load static %}
 {% load i18n %}
 
-{% if request.htmx %}
+<!-- Tab bar update via OOB swap (only on HTMX navigation) -->
 <div id="dashboard-tabbar" hx-swap-oob="innerHTML">
 <ion-footer>
 {% include "invoicing/partials/tabbar.html" with current_view='settings' %}
 </ion-footer>
 </div>
-{% endif %}
 
 {% csrf_token %}
 <div x-data="settingsApp()" class="ion-padding">
