@@ -1,0 +1,60 @@
+{% load i18n %}
+{# Template for subsequent infinite scroll pages (page > 1) - returns only rows + next trigger #}
+
+{% for invoice in invoices %}
+<tr style="border-bottom: 1px solid var(--ion-border-color);">
+    <td class="p-3">
+        <span class="font-medium">{{ invoice.number|default:_("Draft") }}</span>
+    </td>
+    <td class="p-3">
+        <div>{{ invoice.customer_name }}</div>
+        {% if invoice.customer_tax_id %}
+        <div class="text-xs" style="color: var(--ion-color-medium);">{{ invoice.customer_tax_id }}</div>
+        {% endif %}
+    </td>
+    <td class="p-3">{{ invoice.issue_date|date:"Y-m-d" }}</td>
+    <td class="p-3 text-right font-medium">EUR{{ invoice.total }}</td>
+    <td class="p-3 text-center">
+        {% if invoice.status == 'draft' %}
+        <ion-badge color="medium">{% trans "Draft" %}</ion-badge>
+        {% elif invoice.status == 'issued' %}
+        <ion-badge color="primary">{% trans "Issued" %}</ion-badge>
+        {% elif invoice.status == 'paid' %}
+        <ion-badge color="success">{% trans "Paid" %}</ion-badge>
+        {% elif invoice.status == 'cancelled' %}
+        <ion-badge color="danger">{% trans "Cancelled" %}</ion-badge>
+        {% endif %}
+    </td>
+    <td class="p-3 text-center">
+        <ion-button size="small" fill="clear"
+            hx-get="{% url 'invoicing:invoice_detail' invoice.id %}"
+            hx-target="#dashboard-content"
+            hx-push-url="true">
+            <ion-icon slot="icon-only" name="eye-outline"></ion-icon>
+        </ion-button>
+    </td>
+</tr>
+{% endfor %}
+
+<!-- Next page infinite scroll trigger -->
+{% if has_next %}
+<tr>
+    <td colspan="6" class="p-0">
+        <div class="infinite-scroll-loader"
+             hx-get="{{ request.path }}?page={{ next_page }}{% if search %}&search={{ search }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}&per_page={{ per_page }}"
+             hx-trigger="revealed"
+             hx-target="closest tr"
+             hx-swap="outerHTML">
+            <ion-spinner name="crescent"></ion-spinner>
+        </div>
+    </td>
+</tr>
+{% else %}
+<tr>
+    <td colspan="6" class="p-0">
+        <div class="infinite-scroll-end">
+            {% blocktrans count count=total_count %}{{ count }} invoice{% plural %}{{ count }} invoices{% endblocktrans %}
+        </div>
+    </td>
+</tr>
+{% endif %}

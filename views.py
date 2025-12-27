@@ -55,11 +55,10 @@ def dashboard(request):
 @require_http_methods(["GET"])
 def invoices_list(request):
     """
-    List all invoices with filters.
-
-    Note: This view has special HTMX handling for table-only updates,
-    so we don't use @htmx_view decorator here.
+    List all invoices with filters and infinite scroll.
     """
+    from apps.core.htmx import InfiniteScrollPaginator
+
     search = request.GET.get('search', '').strip()
     status_filter = request.GET.get('status', '')
     date_from = request.GET.get('date_from', '')
@@ -84,24 +83,44 @@ def invoices_list(request):
             Q(customer_tax_id__icontains=search)
         )
 
-    invoices = invoices.order_by('-issue_date', '-created_at')[:100]
+    invoices = invoices.order_by('-issue_date', '-created_at')
+
+    # Pagination with infinite scroll
+    per_page = int(request.GET.get('per_page', 25))
+    paginator = InfiniteScrollPaginator(invoices, per_page=per_page)
+    page_data = paginator.get_page(request.GET.get('page', 1))
 
     context = {
         'page_title': _('Facturas'),
-        'invoices': invoices,
+        'invoices': page_data['items'],
+        'has_next': page_data['has_next'],
+        'next_page': page_data['next_page'],
+        'total_count': page_data['total_count'],
+        'page_number': page_data['page_number'],
+        'search': search,
+        'status_filter': status_filter,
+        'date_from': date_from,
+        'date_to': date_to,
+        'per_page': per_page,
     }
+
+    # Determine which template to render
+    is_htmx = request.headers.get('HX-Request') or request.GET.get('partial') == 'true'
+    page_num = page_data['page_number']
 
     # HTMX partial for table only (filters use this target)
     if request.headers.get('HX-Target') == 'invoices-table-container':
         return render(request, 'invoicing/partials/invoices_table.html', context)
 
-    # Check if partial requested via HTMX or ?partial=true query param
-    is_partial = request.headers.get('HX-Request') or request.GET.get('partial') == 'true'
+    if not is_htmx:
+        return render(request, 'invoicing/pages/invoices.html', context)
 
-    if is_partial:
-        return render(request, 'invoicing/partials/invoices_content.html', context)
+    if page_num > 1:
+        # Subsequent pages - only return table rows + loader
+        return render(request, 'invoicing/partials/invoices_rows_infinite.html', context)
 
-    return render(request, 'invoicing/pages/invoices.html', context)
+    # First HTMX request - return full content partial
+    return render(request, 'invoicing/partials/invoices_content.html', context)
 
 
 @require_http_methods(["GET"])

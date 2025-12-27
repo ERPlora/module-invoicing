@@ -1,8 +1,8 @@
 {% load i18n %}
 
-<div class="overflow-x-auto">
+<div class="scroll-ios scroll-list" style="max-height: calc(100vh - 400px);">
     <table class="w-full">
-        <thead>
+        <thead style="position: sticky; top: 0; z-index: 10;">
             <tr style="background: var(--ion-color-light);">
                 <th class="p-3 text-left text-sm font-medium">{% trans "Number" %}</th>
                 <th class="p-3 text-left text-sm font-medium">{% trans "Customer" %}</th>
@@ -12,7 +12,7 @@
                 <th class="p-3 text-center text-sm font-medium">{% trans "Actions" %}</th>
             </tr>
         </thead>
-        <tbody>
+        <tbody id="invoices-tbody">
             {% for invoice in invoices %}
             <tr style="border-bottom: 1px solid var(--ion-border-color);">
                 <td class="p-3">
@@ -25,7 +25,7 @@
                     {% endif %}
                 </td>
                 <td class="p-3">{{ invoice.issue_date|date:"Y-m-d" }}</td>
-                <td class="p-3 text-right font-medium">€{{ invoice.total }}</td>
+                <td class="p-3 text-right font-medium">EUR{{ invoice.total }}</td>
                 <td class="p-3 text-center">
                     {% if invoice.status == 'draft' %}
                     <ion-badge color="medium">{% trans "Draft" %}</ion-badge>
@@ -63,4 +63,22 @@
             {% endfor %}
         </tbody>
     </table>
+
+    <!-- Infinite scroll trigger -->
+    {% if has_next %}
+    <div class="infinite-scroll-loader"
+         hx-get="{{ request.path }}?page={{ next_page }}{% if search %}&search={{ search }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}&per_page={{ per_page }}"
+         hx-trigger="revealed"
+         hx-target="#invoices-tbody"
+         hx-swap="beforeend"
+         hx-select="#invoices-tbody > tr, .infinite-scroll-loader, .infinite-scroll-end">
+        <ion-spinner name="crescent"></ion-spinner>
+    </div>
+    {% else %}
+    {% if total_count > 0 %}
+    <div class="infinite-scroll-end">
+        {% blocktrans count count=total_count %}{{ count }} invoice{% plural %}{{ count }} invoices{% endblocktrans %}
+    </div>
+    {% endif %}
+    {% endif %}
 </div>
