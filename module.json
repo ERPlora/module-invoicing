@@ -9,32 +9,52 @@
   "author_email": "support@erplora.com",
   "license": "MIT",
   "category": "accounting",
-  "tags": ["invoicing", "billing", "receipts", "accounting", "pdf", "tax", "documents"],
+  "industries": [
+    "retail",
+    "wholesale",
+    "restaurant",
+    "bar",
+    "cafe",
+    "hotel",
+    "salon",
+    "healthcare",
+    "professional"
+  ],
+  "tags": [
+    "invoicing",
+    "billing",
+    "receipts",
+    "accounting",
+    "pdf",
+    "tax",
+    "documents"
+  ],
   "icon": "document-text-outline",
   "homepage": "https://github.com/ERPlora/module-invoicing",
   "repository_url": "https://github.com/ERPlora/module-invoicing",
   "documentation": "https://docs.erplora.com/modules/invoicing",
-
   "dependencies": {
     "python": [],
-    "modules": ["sales"]
+    "modules": [
+      "sales"
+    ]
   },
-
   "compatibility": {
     "min_erplora_version": "1.0.0",
     "max_erplora_version": "2.0.0"
   },
-
   "features": {
     "i18n": true,
-    "languages": ["en", "es"],
+    "languages": [
+      "en",
+      "es"
+    ],
     "api": true,
     "webhooks": false,
     "background_tasks": false,
     "supports_export": true,
     "supports_import": false
   },
-
   "permissions": [
     "invoicing.view_invoice",
     "invoicing.add_invoice",
@@ -45,7 +65,6 @@
     "invoicing.change_invoiceseries",
     "invoicing.delete_invoiceseries"
   ],
-
   "menu": {
     "label": "Invoicing",
     "label_es": "Facturación",
@@ -53,7 +72,6 @@
     "url": "/modules/invoicing/",
     "order": 30
   },
-
   "settings": {
     "default_series": {
       "type": "string",
@@ -80,22 +98,52 @@
       "description_es": "Se requieren datos del cliente para generar una factura"
     }
   },
-
   "api_endpoints": [
-    {"path": "/", "method": "GET", "description": "Invoice dashboard"},
-    {"path": "/invoices/", "method": "GET", "description": "List invoices"},
-    {"path": "/invoices/create/", "method": "POST", "description": "Create invoice"},
-    {"path": "/invoices/<id>/", "method": "GET", "description": "View invoice"},
-    {"path": "/invoices/<id>/pdf/", "method": "GET", "description": "Download PDF"},
-    {"path": "/series/", "method": "GET", "description": "List invoice series"},
-    {"path": "/settings/", "method": "GET", "description": "Module settings"}
+    {
+      "path": "/",
+      "method": "GET",
+      "description": "Invoice dashboard"
+    },
+    {
+      "path": "/invoices/",
+      "method": "GET",
+      "description": "List invoices"
+    },
+    {
+      "path": "/invoices/create/",
+      "method": "POST",
+      "description": "Create invoice"
+    },
+    {
+      "path": "/invoices/<id>/",
+      "method": "GET",
+      "description": "View invoice"
+    },
+    {
+      "path": "/invoices/<id>/pdf/",
+      "method": "GET",
+      "description": "Download PDF"
+    },
+    {
+      "path": "/series/",
+      "method": "GET",
+      "description": "List invoice series"
+    },
+    {
+      "path": "/settings/",
+      "method": "GET",
+      "description": "Module settings"
+    }
   ],
-
   "database": {
     "migrations": true,
-    "models": ["Invoice", "InvoiceLine", "InvoiceSeries", "InvoicingConfig"]
+    "models": [
+      "Invoice",
+      "InvoiceLine",
+      "InvoiceSeries",
+      "InvoicingConfig"
+    ]
   },
-
   "changelog": {
     "1.0.0": {
       "date": "2025-12-25",
