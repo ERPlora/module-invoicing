@@ -3,7 +3,7 @@
 <ion-tab-bar>
     <ion-tab-button
         hx-get="{% url 'invoicing:dashboard' %}"
-        hx-target="#dashboard-content"
+        hx-target="#main-content-area"
         hx-push-url="true"
         class="{% if current_view == 'dashboard' %}tab-selected{% endif %}">
         <ion-icon name="grid-outline"></ion-icon>
@@ -11,7 +11,7 @@
     </ion-tab-button>
     <ion-tab-button
         hx-get="{% url 'invoicing:invoices' %}"
-        hx-target="#dashboard-content"
+        hx-target="#main-content-area"
         hx-push-url="true"
         class="{% if current_view == 'invoices' %}tab-selected{% endif %}">
         <ion-icon name="document-text-outline"></ion-icon>
@@ -19,7 +19,7 @@
     </ion-tab-button>
     <ion-tab-button
         hx-get="{% url 'invoicing:series' %}"
-        hx-target="#dashboard-content"
+        hx-target="#main-content-area"
         hx-push-url="true"
         class="{% if current_view == 'series' %}tab-selected{% endif %}">
         <ion-icon name="list-outline"></ion-icon>
@@ -27,7 +27,7 @@
     </ion-tab-button>
     <ion-tab-button
         hx-get="{% url 'invoicing:settings' %}"
-        hx-target="#dashboard-content"
+        hx-target="#main-content-area"
         hx-push-url="true"
         class="{% if current_view == 'settings' %}tab-selected{% endif %}">
         <ion-icon name="settings-outline"></ion-icon>

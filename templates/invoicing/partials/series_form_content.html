@@ -1,35 +1,20 @@
-{% load static %}
-{% load i18n %}
+{% load static i18n ui %}
 
+{% if request.htmx %}
 <!-- Tab bar update via OOB swap (only on HTMX navigation) -->
-<div id="dashboard-tabbar" hx-swap-oob="innerHTML">
-<ion-footer>
+<ion-footer id="dashboard-tabbar" hx-swap-oob="outerHTML">
 {% include "invoicing/partials/tabbar.html" with current_view='series' %}
 </ion-footer>
-</div>
+{% endif %}
+
+{% if series %}
+{% ui_page_header title=_("Edit Series") %}
+{% else %}
+{% ui_page_header title=_("New Series") %}
+{% endif %}
 
 {% csrf_token %}
 <div x-data="seriesFormApp()" class="ion-padding">
-    <!-- Page Header -->
-    <div class="flex justify-between items-center mb-6">
-        <div class="flex items-center gap-4">
-            <ion-button fill="clear"
-                hx-get="{% url 'invoicing:series' %}"
-                hx-target="#dashboard-content"
-                hx-push-url="true">
-                <ion-icon slot="icon-only" name="arrow-back-outline"></ion-icon>
-            </ion-button>
-            <div>
-                <h1 class="text-2xl font-bold" style="color: var(--ion-text-color);">
-                    {% if series %}{% trans "Edit Series" %}{% else %}{% trans "New Series" %}{% endif %}
-                </h1>
-            </div>
-        </div>
-        <ion-button @click="saveSeries()" color="success">
-            <ion-icon slot="start" name="save-outline"></ion-icon>
-            {% trans "Save" %}
-        </ion-button>
-    </div>
 
     <ion-card class="m-0">
         <ion-card-content>
@@ -153,8 +138,8 @@ window.seriesFormApp = function() {
     }
 };
 
-// Re-initialize Alpine after HTMX swap
-document.addEventListener('htmx:afterSwap', function(event) {
+// Re-initialize Alpine after HTMX settles (ensures scripts have executed)
+document.addEventListener('htmx:afterSettle', function(event) {
     if (event.detail.target.id === 'dashboard-content') {
         const alpineEl = event.detail.target.querySelector('[x-data]');
         if (alpineEl && !alpineEl._x_dataStack) {

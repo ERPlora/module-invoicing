@@ -388,17 +388,23 @@ class TestSettingsView:
 
         assert response.status_code == 200
 
-    def test_settings_save(self, client, series):
-        """Test POST save settings."""
-        response = client.post('/modules/invoicing/settings/', {
-            'company_name': 'Test Company',
-            'company_tax_id': 'B12345678',
-            'company_address': 'Test Address',
-            'company_phone': '+34600123456',
-            'company_email': 'test@company.com',
-            'default_series': 'F',
-            'invoice_footer': 'Thanks for your business'
-        })
+    def test_settings_save_json(self, client, series):
+        """Test POST save settings via JSON endpoint."""
+        response = client.post(
+            '/modules/invoicing/settings/save/',
+            data=json.dumps({
+                'company_name': 'Test Company',
+                'company_tax_id': 'B12345678',
+                'company_address': 'Test Address',
+                'company_phone': '+34600123456',
+                'company_email': 'test@company.com',
+                'default_series': 'F',
+                'auto_generate_invoice': True,
+                'require_customer': False,
+                'invoice_footer': 'Thanks for your business'
+            }),
+            content_type='application/json'
+        )
 
         assert response.status_code == 200
         data = json.loads(response.content)
@@ -406,3 +412,42 @@ class TestSettingsView:
 
         config = InvoicingConfig.get_config()
         assert config.company_name == 'Test Company'
+        assert config.company_tax_id == 'B12345678'
+        assert config.auto_generate_invoice is True
+
+    def test_settings_save_invalid_json(self, client, series):
+        """Test saving with invalid JSON."""
+        response = client.post(
+            '/modules/invoicing/settings/save/',
+            data='invalid json',
+            content_type='application/json'
+        )
+
+        assert response.status_code == 400
+
+    def test_settings_persist(self, client, series):
+        """Test settings are persisted."""
+        response = client.post(
+            '/modules/invoicing/settings/save/',
+            data=json.dumps({
+                'company_name': 'My Business',
+                'company_tax_id': 'A99999999',
+                'company_address': '123 Main St',
+                'company_phone': '+34911111111',
+                'company_email': 'info@mybusiness.com',
+                'default_series': 'F',
+                'auto_generate_invoice': False,
+                'require_customer': True,
+                'invoice_footer': 'Payment due within 30 days'
+            }),
+            content_type='application/json'
+        )
+
+        assert response.status_code == 200
+
+        config = InvoicingConfig.get_config()
+        assert config.company_name == 'My Business'
+        assert config.company_address == '123 Main St'
+        assert config.auto_generate_invoice is False
+        assert config.require_customer is True
+        assert config.invoice_footer == 'Payment due within 30 days'

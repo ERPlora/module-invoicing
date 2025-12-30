@@ -1,30 +1,16 @@
-{% load static %}
-{% load i18n %}
+{% load static i18n ui %}
 
+{% if request.htmx %}
 <!-- Tab bar update via OOB swap (only on HTMX navigation) -->
-<div id="dashboard-tabbar" hx-swap-oob="innerHTML">
-<ion-footer>
+<ion-footer id="dashboard-tabbar" hx-swap-oob="outerHTML">
 {% include "invoicing/partials/tabbar.html" with current_view='series' %}
 </ion-footer>
-</div>
+{% endif %}
+
+{% ui_page_header title=_("Invoice Series") action_icon="add-outline" action_label=_("New Series") action_hx_get="/modules/invoicing/series/create/" action_hx_target="#main-content-area" action_hx_push_url="true" %}
 
 {% csrf_token %}
 <div x-data="seriesApp()" class="ion-padding">
-    <!-- Page Header -->
-    <div class="flex justify-between items-center mb-6">
-        <div>
-            <h1 class="text-2xl font-bold" style="color: var(--ion-text-color);">{% trans "Invoice Series" %}</h1>
-            <p class="text-sm mt-1" style="color: var(--ion-color-medium);">{% trans "Manage invoice numbering series" %}</p>
-        </div>
-        <ion-button
-            color="success"
-            hx-get="{% url 'invoicing:series_create' %}"
-            hx-target="#dashboard-content"
-            hx-push-url="true">
-            <ion-icon slot="start" name="add-outline"></ion-icon>
-            {% trans "New Series" %}
-        </ion-button>
-    </div>
 
     <!-- Series List -->
     <ion-card class="m-0">
@@ -51,7 +37,7 @@
                         {% endif %}
                         <ion-button fill="clear" size="small"
                             hx-get="{% url 'invoicing:series_edit' series.id %}"
-                            hx-target="#dashboard-content"
+                            hx-target="#main-content-area"
                             hx-push-url="true">
                             <ion-icon slot="icon-only" name="create-outline"></ion-icon>
                         </ion-button>
@@ -122,8 +108,8 @@ window.seriesApp = function() {
     }
 };
 
-// Re-initialize Alpine after HTMX swap
-document.addEventListener('htmx:afterSwap', function(event) {
+// Re-initialize Alpine after HTMX settles (ensures scripts have executed)
+document.addEventListener('htmx:afterSettle', function(event) {
     if (event.detail.target.id === 'dashboard-content') {
         const alpineEl = event.detail.target.querySelector('[x-data]');
         if (alpineEl && !alpineEl._x_dataStack) {

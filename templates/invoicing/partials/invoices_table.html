@@ -40,7 +40,7 @@
                 <td class="p-3 text-center">
                     <ion-button size="small" fill="clear"
                         hx-get="{% url 'invoicing:invoice_detail' invoice.id %}"
-                        hx-target="#dashboard-content"
+                        hx-target="#main-content-area"
                         hx-push-url="true">
                         <ion-icon slot="icon-only" name="eye-outline"></ion-icon>
                     </ion-button>
@@ -53,7 +53,7 @@
                     <p class="mt-4" style="color: var(--ion-color-medium);">{% trans "No invoices found" %}</p>
                     <ion-button class="mt-4"
                         hx-get="{% url 'invoicing:invoice_create' %}"
-                        hx-target="#dashboard-content"
+                        hx-target="#main-content-area"
                         hx-push-url="true">
                         <ion-icon slot="start" name="add-outline"></ion-icon>
                         {% trans "Create First Invoice" %}

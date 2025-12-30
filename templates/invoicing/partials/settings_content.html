@@ -1,225 +1,249 @@
-{% load static %}
-{% load i18n %}
+{% load static i18n ui component_tags %}
 
-<!-- Tab bar update via OOB swap (only on HTMX navigation) -->
-<div id="dashboard-tabbar" hx-swap-oob="innerHTML">
-<ion-footer>
-{% include "invoicing/partials/tabbar.html" with current_view='settings' %}
-</ion-footer>
-</div>
+{% component "settings_page"
+    title=_("Invoicing Settings")
+    subtitle=_("Configure invoicing module behavior and company data")
+    tabbar_template="invoicing/partials/tabbar.html"
+    tabbar_view="settings"
+    alpine_app="settingsApp" %}
 
-{% csrf_token %}
-<div x-data="settingsApp()" class="ion-padding">
-    <!-- Page Header -->
-    <div class="mb-6">
-        <h1 class="text-2xl font-bold" style="color: var(--ion-text-color);">{% trans "Invoicing Settings" %}</h1>
-        <p class="text-sm mt-1" style="color: var(--ion-color-medium);">{% trans "Configure invoicing module behavior and company data" %}</p>
-    </div>
+    {% fill "settings" %}
+        {% component "setting_section" title=_("Company Information") description=_("This information will appear on your invoices") %}
+            {% component "setting_input"
+                name="company_name"
+                title=_("Company Name")
+                description=_("Your business name for invoices")
+                value=config.company_name
+                type="text"
+                placeholder="Your Company Name" %}{% endcomponent %}
 
-    <!-- Company Information -->
-    <ion-card class="m-0 mb-4">
-        <ion-card-header>
-            <ion-card-title>{% trans "Company Information" %}</ion-card-title>
-            <ion-card-subtitle>{% trans "This information will appear on your invoices" %}</ion-card-subtitle>
-        </ion-card-header>
-        <ion-card-content>
-            <form id="settings-form" method="POST">
-                {% csrf_token %}
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <ion-item>
-                        <ion-input
-                            name="company_name"
-                            label="{% trans 'Company Name' %}"
-                            label-placement="stacked"
-                            value="{{ config.company_name }}"
-                            placeholder="{% trans 'Your Company Name' %}">
-                        </ion-input>
-                    </ion-item>
-                    <ion-item>
-                        <ion-input
-                            name="company_tax_id"
-                            label="{% trans 'Tax ID (NIF/CIF)' %}"
-                            label-placement="stacked"
-                            value="{{ config.company_tax_id }}"
-                            placeholder="B12345678">
-                        </ion-input>
-                    </ion-item>
-                    <ion-item class="md:col-span-2">
-                        <ion-textarea
-                            name="company_address"
-                            label="{% trans 'Address' %}"
-                            label-placement="stacked"
-                            rows="2"
-                            placeholder="{% trans 'Street, City, Postal Code' %}">{{ config.company_address }}</ion-textarea>
-                    </ion-item>
-                    <ion-item>
-                        <ion-input
-                            name="company_phone"
-                            label="{% trans 'Phone' %}"
-                            label-placement="stacked"
-                            type="tel"
-                            value="{{ config.company_phone }}"
-                            placeholder="+34 600 000 000">
-                        </ion-input>
-                    </ion-item>
-                    <ion-item>
-                        <ion-input
-                            name="company_email"
-                            label="{% trans 'Email' %}"
-                            label-placement="stacked"
-                            type="email"
-                            value="{{ config.company_email }}"
-                            placeholder="info@company.com">
-                        </ion-input>
-                    </ion-item>
-                </div>
-            </form>
-        </ion-card-content>
-    </ion-card>
+            {% component "setting_input"
+                name="company_tax_id"
+                title=_("Tax ID (NIF/CIF)")
+                description=_("Tax identification number")
+                value=config.company_tax_id
+                type="text"
+                placeholder="B12345678" %}{% endcomponent %}
 
-    <!-- Invoice Settings -->
-    <ion-card class="m-0 mb-4">
-        <ion-card-header>
-            <ion-card-title>{% trans "Invoice Settings" %}</ion-card-title>
-        </ion-card-header>
-        <ion-card-content>
-            <div class="space-y-4">
-                <!-- Default Series -->
-                <div class="flex items-center justify-between p-4 rounded-lg" style="background: var(--ion-color-light);">
-                    <div>
-                        <h3 class="font-medium">{% trans "Default Series" %}</h3>
-                        <p class="text-sm text-medium">{% trans "Series used for new invoices" %}</p>
-                    </div>
-                    <ion-select
-                        name="default_series"
-                        interface="popover"
-                        value="{{ config.default_series }}"
-                        form="settings-form">
-                        {% for series in series_list %}
-                        <ion-select-option value="{{ series.prefix }}">{{ series.prefix }} - {{ series.name }}</ion-select-option>
-                        {% empty %}
-                        <ion-select-option value="F">F - {% trans "Default" %}</ion-select-option>
-                        {% endfor %}
-                    </ion-select>
-                </div>
+            {% component "setting_textarea"
+                name="company_address"
+                title=_("Address")
+                description=_("Company address for invoices")
+                value=config.company_address
+                placeholder="Street, City, Postal Code"
+                rows=2 %}{% endcomponent %}
 
-                <!-- Auto Generate Invoice -->
-                <div class="flex items-center justify-between p-4 rounded-lg" style="background: var(--ion-color-light);">
-                    <div>
-                        <h3 class="font-medium">{% trans "Auto Generate Invoice" %}</h3>
-                        <p class="text-sm text-medium">{% trans "Automatically create invoice after sale" %}</p>
-                    </div>
-                    <ion-toggle
-                        name="auto_generate_invoice"
-                        form="settings-form"
-                        {% if config.auto_generate_invoice %}checked{% endif %}>
-                    </ion-toggle>
-                </div>
+            {% component "setting_input"
+                name="company_phone"
+                title=_("Phone")
+                description=_("Contact phone number")
+                value=config.company_phone
+                type="tel"
+                placeholder="+34 600 000 000" %}{% endcomponent %}
 
-                <!-- Require Customer -->
-                <div class="flex items-center justify-between p-4 rounded-lg" style="background: var(--ion-color-light);">
-                    <div>
-                        <h3 class="font-medium">{% trans "Require Customer" %}</h3>
-                        <p class="text-sm text-medium">{% trans "Customer is mandatory for invoices" %}</p>
-                    </div>
-                    <ion-toggle
-                        name="require_customer"
-                        form="settings-form"
-                        {% if config.require_customer %}checked{% endif %}>
-                    </ion-toggle>
-                </div>
-            </div>
-        </ion-card-content>
-    </ion-card>
+            {% component "setting_input"
+                name="company_email"
+                title=_("Email")
+                description=_("Contact email address")
+                value=config.company_email
+                type="email"
+                placeholder="info@company.com" %}{% endcomponent %}
+        {% endcomponent %}
 
-    <!-- Invoice Footer -->
-    <ion-card class="m-0 mb-4">
-        <ion-card-header>
-            <ion-card-title>{% trans "Invoice Footer" %}</ion-card-title>
-            <ion-card-subtitle>{% trans "Text that appears at the bottom of invoices" %}</ion-card-subtitle>
-        </ion-card-header>
-        <ion-card-content>
-            <ion-textarea
+        {% component "setting_section" title=_("Invoice Settings") %}
+            {% component "setting_select"
+                name="default_series"
+                title=_("Default Series")
+                description=_("Series used for new invoices")
+                value=config.default_series
+                options=series_options
+                placeholder="Select series" %}{% endcomponent %}
+
+            {% component "setting_toggle"
+                name="auto_generate_invoice"
+                title=_("Auto Generate Invoice")
+                description=_("Automatically create invoice after sale")
+                checked=config.auto_generate_invoice %}{% endcomponent %}
+
+            {% component "setting_toggle"
+                name="require_customer"
+                title=_("Require Customer")
+                description=_("Customer is mandatory for invoices")
+                checked=config.require_customer
+                color="warning" %}{% endcomponent %}
+        {% endcomponent %}
+
+        {% component "setting_section" title=_("Invoice Footer") description=_("Text that appears at the bottom of invoices") %}
+            {% component "setting_textarea"
                 name="invoice_footer"
-                form="settings-form"
-                rows="3"
-                placeholder="{% trans 'Payment terms, legal information, thank you message...' %}">{{ config.invoice_footer }}</ion-textarea>
-        </ion-card-content>
-    </ion-card>
+                title=_("Footer Text")
+                description=_("Payment terms, legal information, thank you message")
+                value=config.invoice_footer
+                placeholder="Payment terms, legal information, thank you message..."
+                rows=3 %}{% endcomponent %}
+        {% endcomponent %}
+    {% endfill %}
 
-    <!-- Save Button -->
-    <div class="flex justify-end gap-4">
-        <ion-button color="medium" fill="outline" @click="resetForm()">
-            <ion-icon slot="start" name="refresh-outline"></ion-icon>
-            {% trans "Reset" %}
-        </ion-button>
-        <ion-button @click="saveSettings()" color="success">
-            <ion-icon slot="start" name="save-outline"></ion-icon>
-            {% trans "Save Settings" %}
-        </ion-button>
-    </div>
-
-    <!-- Info Section -->
-    <div class="mt-6 p-4 rounded-lg" style="background: var(--ion-color-step-50);">
-        <div class="flex items-start gap-2">
-            <ion-icon name="information-circle-outline" style="font-size: 20px; color: var(--ion-color-primary); margin-top: 2px;"></ion-icon>
-            <p class="text-sm" style="color: var(--ion-color-medium);">
-                {% trans "Company information will be displayed on all invoices. Make sure the Tax ID is correct for legal compliance. To manage invoice series, go to the Series tab." %}
-            </p>
+    {% fill "actions" %}
+        <div class="mt-lg pt-md" style="border-top: 1px solid var(--border-color);">
+            <ion-button
+                color="medium"
+                fill="outline"
+                expand="block"
+                @click="resetToDefaults()">
+                <ion-icon slot="start" name="refresh-outline"></ion-icon>
+                {% trans "Reset to Defaults" %}
+            </ion-button>
         </div>
-    </div>
-</div>
+
+        <!-- Info Section -->
+        <div class="mt-md p-md rounded-lg" style="background: var(--ion-color-step-50);">
+            <div class="flex items-start gap-2">
+                <ion-icon name="information-circle-outline" style="font-size: 20px; color: var(--ion-color-primary); margin-top: 2px;"></ion-icon>
+                <p class="text-sm m-0" style="color: var(--ion-color-medium);">
+                    {% trans "Company information will be displayed on all invoices. Make sure the Tax ID is correct for legal compliance. To manage invoice series, go to the Series tab." %}
+                </p>
+            </div>
+        </div>
+    {% endfill %}
+{% endcomponent %}
 
 <script>
-// Register globally for HTMX compatibility
-window.settingsApp = function() {
+function settingsApp() {
     return {
-        async saveSettings() {
-            const form = document.getElementById('settings-form');
-            const formData = new FormData(form);
+        settings: {
+            company_name: "{{ config.company_name|escapejs }}",
+            company_tax_id: "{{ config.company_tax_id|escapejs }}",
+            company_address: "{{ config.company_address|escapejs }}",
+            company_phone: "{{ config.company_phone|escapejs }}",
+            company_email: "{{ config.company_email|escapejs }}",
+            default_series: "{{ config.default_series|escapejs }}",
+            auto_generate_invoice: {{ config.auto_generate_invoice|yesno:"true,false" }},
+            require_customer: {{ config.require_customer|yesno:"true,false" }},
+            invoice_footer: "{{ config.invoice_footer|escapejs }}"
+        },
+
+        init() {
+            this.$nextTick(() => {
+                // Toggles
+                this.setupToggle('toggle_auto_generate_invoice', 'auto_generate_invoice');
+                this.setupToggle('toggle_require_customer', 'require_customer');
+
+                // Text inputs
+                this.setupInput('input_company_name', 'company_name', 'string');
+                this.setupInput('input_company_tax_id', 'company_tax_id', 'string');
+                this.setupInput('input_company_phone', 'company_phone', 'string');
+                this.setupInput('input_company_email', 'company_email', 'string');
+
+                // Textareas
+                this.setupTextarea('textarea_company_address', 'company_address');
+                this.setupTextarea('textarea_invoice_footer', 'invoice_footer');
+
+                // Select
+                this.setupSelect('select_default_series', 'default_series');
+            });
+        },
+
+        setupToggle(refName, settingKey) {
+            const toggle = this.$refs[refName];
+            if (toggle) {
+                toggle.addEventListener('ionChange', (e) => {
+                    this.updateSetting(settingKey, e.detail.checked);
+                });
+            }
+        },
+
+        setupInput(refName, settingKey, type = 'string') {
+            const input = this.$refs[refName];
+            if (input) {
+                input.addEventListener('ionChange', (e) => {
+                    let value = e.detail.value;
+                    if (type === 'int') {
+                        value = parseInt(value) || 0;
+                    } else if (type === 'decimal') {
+                        value = parseFloat(value) || 0;
+                    }
+                    this.updateSetting(settingKey, value);
+                });
+            }
+        },
+
+        setupTextarea(refName, settingKey) {
+            const textarea = this.$refs[refName];
+            if (textarea) {
+                textarea.addEventListener('ionChange', (e) => {
+                    this.updateSetting(settingKey, e.detail.value || '');
+                });
+            }
+        },
+
+        setupSelect(refName, settingKey) {
+            const select = this.$refs[refName];
+            if (select) {
+                select.addEventListener('ionChange', (e) => {
+                    this.updateSetting(settingKey, e.detail.value);
+                });
+            }
+        },
+
+        async updateSetting(key, value) {
+            this.settings[key] = value;
 
             try {
-                const response = await fetch('{% url "invoicing:settings" %}', {
+                const response = await fetch('{% url "invoicing:settings_save" %}', {
                     method: 'POST',
-                    body: formData
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': Alpine.store('ui').getCsrfToken()
+                    },
+                    body: JSON.stringify(this.settings)
                 });
 
-                const data = await response.json();
-                if (data.success) {
-                    this.showToast(data.message, 'success');
+                const result = await response.json();
+                if (response.ok && result.success) {
+                    Alpine.store('ui').success('{% trans "Settings saved" %}');
                 } else {
-                    this.showToast(data.error, 'danger');
+                    throw new Error(result.error || 'Unknown error');
                 }
             } catch (error) {
-                this.showToast('{% trans "Error saving settings" %}', 'danger');
+                Alpine.store('ui').error('{% trans "Error saving settings" %}');
             }
         },
 
-        resetForm() {
-            if (confirm('{% trans "Reset all settings to their original values?" %}')) {
-                htmx.ajax('GET', '{% url "invoicing:settings" %}', {target: '#dashboard-content'});
+        async resetToDefaults() {
+            this.settings = {
+                company_name: '',
+                company_tax_id: '',
+                company_address: '',
+                company_phone: '',
+                company_email: '',
+                default_series: 'F',
+                auto_generate_invoice: false,
+                require_customer: false,
+                invoice_footer: ''
+            };
+
+            try {
+                const response = await fetch('{% url "invoicing:settings_save" %}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': Alpine.store('ui').getCsrfToken()
+                    },
+                    body: JSON.stringify(this.settings)
+                });
+
+                const result = await response.json();
+                if (response.ok && result.success) {
+                    Alpine.store('ui').toast('{% trans "Settings reset to defaults" %}', 'warning');
+                    setTimeout(() => window.location.reload(), 1000);
+                } else {
+                    throw new Error(result.error || 'Unknown error');
+                }
+            } catch (error) {
+                Alpine.store('ui').error('{% trans "Error resetting settings" %}');
             }
-        },
-
-        async showToast(message, color = 'primary') {
-            const toast = document.createElement('ion-toast');
-            toast.message = message;
-            toast.duration = 2000;
-            toast.color = color;
-            toast.position = 'top';
-            document.body.appendChild(toast);
-            await toast.present();
         }
     }
-};
-
-// Re-initialize Alpine after HTMX swap
-document.addEventListener('htmx:afterSwap', function(event) {
-    if (event.detail.target.id === 'dashboard-content') {
-        const alpineEl = event.detail.target.querySelector('[x-data]');
-        if (alpineEl && !alpineEl._x_dataStack) {
-            Alpine.initTree(alpineEl);
-        }
-    }
-});
+}
 </script>

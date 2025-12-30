@@ -24,4 +24,5 @@ urlpatterns = [
 
     # Settings
     path('settings/', views.settings_view, name='settings'),
+    path('settings/save/', views.settings_save, name='settings_save'),
 ]

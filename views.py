@@ -21,6 +21,8 @@ def dashboard(request):
     """
     Main invoicing dashboard with stats.
     """
+    from apps.core.services.currency_service import format_currency
+
     today = timezone.now().date()
     current_month = today.replace(day=1)
 
@@ -43,8 +45,8 @@ def dashboard(request):
         'page_title': _('Facturación'),
         'total_invoices': total_invoices,
         'month_invoices': month_invoices,
-        'month_total': month_total,
-        'pending_amount': pending_amount,
+        'month_total_formatted': format_currency(month_total),
+        'pending_amount_formatted': format_currency(pending_amount),
     }
 
 
@@ -472,40 +474,56 @@ def series_delete(request, series_id):
 # SETTINGS
 # =============================================================================
 
-@require_http_methods(["GET", "POST"])
+@require_http_methods(["GET"])
 @htmx_view('invoicing/pages/settings.html', 'invoicing/partials/settings_content.html')
 def settings_view(request):
     """
     Invoicing module settings.
     """
     config = InvoicingConfig.get_config()
-
-    if request.method == 'POST':
-        try:
-            config.company_name = request.POST.get('company_name', '').strip()
-            config.company_tax_id = request.POST.get('company_tax_id', '').strip()
-            config.company_address = request.POST.get('company_address', '').strip()
-            config.company_phone = request.POST.get('company_phone', '').strip()
-            config.company_email = request.POST.get('company_email', '').strip()
-            config.default_series = request.POST.get('default_series', 'F').strip()
-            config.auto_generate_invoice = request.POST.get('auto_generate_invoice') == 'on'
-            config.require_customer = request.POST.get('require_customer') == 'on'
-            config.invoice_footer = request.POST.get('invoice_footer', '').strip()
-            config.save()
-
-            return JsonResponse({
-                'success': True,
-                'message': _('Configuración guardada correctamente')
-            })
-
-        except Exception as e:
-            return JsonResponse({'success': False, 'error': str(e)})
-
-    # GET - show settings form
     series_list = InvoiceSeries.objects.filter(is_active=True)
+
+    # Build series options for setting_select component
+    series_options = [
+        {'value': s.prefix, 'label': f"{s.prefix} - {s.name}"}
+        for s in series_list
+    ]
+    if not series_options:
+        series_options = [{'value': 'F', 'label': 'F - Default'}]
 
     return {
         'page_title': _('Configuración'),
         'config': config,
-        'series_list': series_list,
+        'series_options': series_options,
     }
+
+
+@require_http_methods(["POST"])
+def settings_save(request):
+    """Save invoicing settings via JSON."""
+    try:
+        data = json.loads(request.body)
+        config = InvoicingConfig.get_config()
+
+        # Company Information
+        config.company_name = data.get('company_name', '').strip()
+        config.company_tax_id = data.get('company_tax_id', '').strip()
+        config.company_address = data.get('company_address', '').strip()
+        config.company_phone = data.get('company_phone', '').strip()
+        config.company_email = data.get('company_email', '').strip()
+
+        # Invoice Settings
+        config.default_series = data.get('default_series', 'F').strip()
+        config.auto_generate_invoice = data.get('auto_generate_invoice', False)
+        config.require_customer = data.get('require_customer', False)
+
+        # Invoice Footer
+        config.invoice_footer = data.get('invoice_footer', '').strip()
+
+        config.save()
+        return JsonResponse({'success': True, 'message': _('Settings saved')})
+
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': _('Invalid JSON')}, status=400)
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)
