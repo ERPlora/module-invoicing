@@ -1,10 +1,7 @@
 {% load static i18n ui %}
 
 {% if request.htmx %}
-<!-- Tab bar update via OOB swap (only on HTMX navigation) -->
-<ion-footer id="dashboard-tabbar" hx-swap-oob="outerHTML">
-{% include "invoicing/partials/tabbar.html" with current_view='invoices' %}
-</ion-footer>
+{% include "invoicing/partials/tabbar.html" with current_view='invoices' oob=True %}
 {% endif %}
 
 {% ui_page_header title=_("New Invoice") %}

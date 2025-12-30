@@ -1,10 +1,7 @@
 {% load static i18n ui %}
 
 {% if request.htmx %}
-<!-- Tab bar update via OOB swap (only on HTMX navigation) -->
-<ion-footer id="dashboard-tabbar" hx-swap-oob="outerHTML">
-{% include "invoicing/partials/tabbar.html" with current_view='series' %}
-</ion-footer>
+{% include "invoicing/partials/tabbar.html" with current_view='series' oob=True %}
 {% endif %}
 
 {% ui_page_header title=_("Invoice Series") action_icon="add-outline" action_label=_("New Series") action_hx_get="/modules/invoicing/series/create/" action_hx_target="#main-content-area" action_hx_push_url="true" %}

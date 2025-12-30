@@ -1,5 +1,6 @@
 {% load i18n %}
 
+<ion-footer id="dashboard-tabbar"{% if oob %} hx-swap-oob="outerHTML"{% endif %}>
 <ion-tab-bar>
     <ion-tab-button
         hx-get="{% url 'invoicing:dashboard' %}"
@@ -34,3 +35,4 @@
         <ion-label>{% trans "Settings" %}</ion-label>
     </ion-tab-button>
 </ion-tab-bar>
+</ion-footer>
