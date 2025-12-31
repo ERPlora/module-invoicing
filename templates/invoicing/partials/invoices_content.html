@@ -6,8 +6,8 @@
     action_label=_("New Invoice")
     action_url=create_url
     action_icon="add-outline"
-    tabbar_template="invoicing/partials/tabbar.html"
-    tabbar_view="invoices" %}
+    module_id="invoicing"
+    current_view="invoices" %}
 
     {% fill "filters" %}
         {% component "filter_bar"

@@ -72,6 +72,32 @@
     "url": "/modules/invoicing/",
     "order": 30
   },
+  "tabs": [
+    {
+      "id": "dashboard",
+      "url": "invoicing:dashboard",
+      "icon": "grid-outline",
+      "label": "Overview"
+    },
+    {
+      "id": "invoices",
+      "url": "invoicing:invoices",
+      "icon": "document-text-outline",
+      "label": "Invoices"
+    },
+    {
+      "id": "series",
+      "url": "invoicing:series",
+      "icon": "list-outline",
+      "label": "Series"
+    },
+    {
+      "id": "settings",
+      "url": "invoicing:settings",
+      "icon": "settings-outline",
+      "label": "Settings"
+    }
+  ],
   "settings": {
     "default_series": {
       "type": "string",

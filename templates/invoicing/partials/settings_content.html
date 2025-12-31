@@ -3,8 +3,8 @@
 {% component "settings_page"
     title=_("Invoicing Settings")
     subtitle=_("Configure invoicing module behavior and company data")
-    tabbar_template="invoicing/partials/tabbar.html"
-    tabbar_view="settings"
+    module_id="invoicing"
+    current_view="settings"
     alpine_app="settingsApp" %}
 
     {% fill "settings" %}
