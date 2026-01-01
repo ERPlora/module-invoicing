@@ -275,56 +275,98 @@ def invoice_create(request):
 def invoice_issue(request, invoice_id):
     """
     Issue a draft invoice (assign number and change status).
+    Supports both HTMX and JSON responses.
     """
+    invoice = get_object_or_404(Invoice, id=invoice_id)
+    is_htmx = request.headers.get('HX-Request')
+
+    if invoice.status != Invoice.Status.DRAFT:
+        error_msg = _('Solo se pueden emitir facturas en borrador')
+        if is_htmx:
+            response = HttpResponse(status=400)
+            response['HX-Trigger'] = f'{{"showToast": {{"message": "{error_msg}", "color": "danger"}}}}'
+            return response
+        return JsonResponse({'success': False, 'error': error_msg})
+
     try:
-        invoice = get_object_or_404(Invoice, id=invoice_id)
-
-        if invoice.status != Invoice.Status.DRAFT:
-            return JsonResponse({
-                'success': False,
-                'error': _('Solo se pueden emitir facturas en borrador')
-            })
-
         # Generate number and issue
         invoice.number = invoice.series.get_next_number()
         invoice.status = Invoice.Status.ISSUED
         invoice.issue_date = timezone.now().date()
         invoice.save()
 
+        success_msg = _('Factura emitida correctamente')
+
+        if is_htmx:
+            # Return updated invoice detail partial
+            config = InvoicingConfig.get_config()
+            response = render(request, 'invoicing/partials/invoice_detail_content.html', {
+                'invoice': invoice,
+                'config': config,
+            })
+            response['HX-Trigger'] = f'{{"showToast": {{"message": "{success_msg}", "color": "success"}}}}'
+            return response
+
         return JsonResponse({
             'success': True,
-            'message': _('Factura emitida correctamente'),
+            'message': success_msg,
             'number': invoice.number
         })
 
     except Exception as e:
-        return JsonResponse({'success': False, 'error': str(e)})
+        error_msg = str(e)
+        if is_htmx:
+            response = HttpResponse(status=500)
+            response['HX-Trigger'] = f'{{"showToast": {{"message": "{error_msg}", "color": "danger"}}}}'
+            return response
+        return JsonResponse({'success': False, 'error': error_msg})
 
 
 @require_http_methods(["POST"])
 def invoice_cancel(request, invoice_id):
     """
     Cancel an invoice.
+    Supports both HTMX and JSON responses.
     """
+    invoice = get_object_or_404(Invoice, id=invoice_id)
+    is_htmx = request.headers.get('HX-Request')
+
+    if invoice.status == Invoice.Status.CANCELLED:
+        error_msg = _('La factura ya está anulada')
+        if is_htmx:
+            response = HttpResponse(status=400)
+            response['HX-Trigger'] = f'{{"showToast": {{"message": "{error_msg}", "color": "danger"}}}}'
+            return response
+        return JsonResponse({'success': False, 'error': error_msg})
+
     try:
-        invoice = get_object_or_404(Invoice, id=invoice_id)
-
-        if invoice.status == Invoice.Status.CANCELLED:
-            return JsonResponse({
-                'success': False,
-                'error': _('La factura ya está anulada')
-            })
-
         invoice.status = Invoice.Status.CANCELLED
         invoice.save()
 
+        success_msg = _('Factura anulada correctamente')
+
+        if is_htmx:
+            # Return updated invoice detail partial
+            config = InvoicingConfig.get_config()
+            response = render(request, 'invoicing/partials/invoice_detail_content.html', {
+                'invoice': invoice,
+                'config': config,
+            })
+            response['HX-Trigger'] = f'{{"showToast": {{"message": "{success_msg}", "color": "warning"}}}}'
+            return response
+
         return JsonResponse({
             'success': True,
-            'message': _('Factura anulada correctamente')
+            'message': success_msg
         })
 
     except Exception as e:
-        return JsonResponse({'success': False, 'error': str(e)})
+        error_msg = str(e)
+        if is_htmx:
+            response = HttpResponse(status=500)
+            response['HX-Trigger'] = f'{{"showToast": {{"message": "{error_msg}", "color": "danger"}}}}'
+            return response
+        return JsonResponse({'success': False, 'error': error_msg})
 
 
 @require_http_methods(["GET"])
@@ -527,3 +569,54 @@ def settings_save(request):
         return JsonResponse({'success': False, 'error': _('Invalid JSON')}, status=400)
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
+
+
+@require_http_methods(["POST"])
+def settings_toggle(request):
+    """Toggle a boolean setting via HTMX."""
+    # Support both 'name'/'value' (new components) and 'setting_name'/'setting_value' (legacy)
+    name = request.POST.get('name') or request.POST.get('setting_name')
+    value = request.POST.get('value', request.POST.get('setting_value', 'false'))
+    setting_value = value == 'true' or value is True
+
+    config = InvoicingConfig.get_config()
+
+    # Only toggle boolean settings
+    boolean_settings = ['auto_generate_invoice', 'require_customer']
+    if name in boolean_settings:
+        setattr(config, name, setting_value)
+        config.save()
+
+    response = HttpResponse(status=204)
+    response['HX-Trigger'] = json.dumps({
+        'showToast': {'message': str(_('Setting updated')), 'color': 'success'}
+    })
+    return response
+
+
+@require_http_methods(["POST"])
+def settings_reset(request):
+    """Reset invoicing settings to defaults."""
+    config = InvoicingConfig.get_config()
+
+    # Reset to defaults
+    config.company_name = ''
+    config.company_tax_id = ''
+    config.company_address = ''
+    config.company_phone = ''
+    config.company_email = ''
+    config.default_series = 'F'
+    config.auto_generate_invoice = False
+    config.require_customer = False
+    config.invoice_footer = ''
+    config.save()
+
+    # Re-render the settings page
+    response = render(request, 'invoicing/partials/settings_content.html', {
+        'config': config,
+        'series_options': [{'value': s.prefix, 'label': s.name} for s in InvoiceSeries.objects.filter(is_active=True)],
+    })
+    response['HX-Trigger'] = json.dumps({
+        'showToast': {'message': str(_('Settings reset to defaults')), 'color': 'warning'}
+    })
+    return response

@@ -1,13 +1,35 @@
 {% load static i18n ui component_tags %}
 
-{% if request.htmx %}
-{% component "tabbar" module_id="invoicing" current_view="invoices" oob=True %}{% endcomponent %}
-{% endif %}
+{# Toast listener for HX-Trigger events #}
+<script>
+(function() {
+    if (!window._invoiceToastListenerAdded) {
+        window._invoiceToastListenerAdded = true;
+        document.body.addEventListener('showToast', function(e) {
+            const detail = e.detail || {};
+            const message = detail.message || 'Done';
+            const color = detail.color || 'success';
 
-{% ui_page_header title=invoice.number|default:_("Draft Invoice") %}
+            const toast = document.createElement('ion-toast');
+            toast.message = message;
+            toast.duration = 2000;
+            toast.position = 'top';
+            toast.color = color;
+            document.body.appendChild(toast);
+            toast.present();
+        });
+    }
+})();
+</script>
 
-{% csrf_token %}
-<div x-data="invoiceDetailApp()" class="ion-padding">
+{% component "page"
+    title=invoice.number|default:_("Draft Invoice")
+    module_id="invoicing"
+    tabbar_view="invoices" %}
+
+    {% fill "content" %}
+        {% csrf_token %}
+        <div id="invoice-detail-container">
     <!-- Status and Actions -->
     <div class="d-flex justify-between align-center mb-md">
         <ion-badge color="{{ invoice.status|default:'medium' }}">
@@ -15,17 +37,25 @@
         </ion-badge>
         <div class="d-flex gap-sm">
             {% if invoice.status == 'draft' %}
-            <ion-button color="success" @click="issueInvoice()">
+            <ion-button color="success"
+                hx-post="{% url 'invoicing:invoice_issue' invoice.id %}"
+                hx-target="#main-content-area"
+                hx-confirm="{% trans 'Issue this invoice? This action cannot be undone.' %}"
+                hx-include="[name='csrfmiddlewaretoken']">
                 <ion-icon slot="start" name="checkmark-circle-outline"></ion-icon>
                 {% trans "Issue Invoice" %}
             </ion-button>
             {% endif %}
             {% if invoice.status != 'cancelled' %}
-            <ion-button fill="outline" @click="window.open('{% url 'invoicing:invoice_print' invoice.id %}', '_blank')">
+            <ion-button fill="outline" onclick="window.open('{% url 'invoicing:invoice_print' invoice.id %}', '_blank')">
                 <ion-icon slot="start" name="print-outline"></ion-icon>
                 {% trans "Print" %}
             </ion-button>
-            <ion-button color="danger" fill="outline" @click="cancelInvoice()">
+            <ion-button color="danger" fill="outline"
+                hx-post="{% url 'invoicing:invoice_cancel' invoice.id %}"
+                hx-target="#main-content-area"
+                hx-confirm="{% trans 'Cancel this invoice? This action cannot be undone.' %}"
+                hx-include="[name='csrfmiddlewaretoken']">
                 <ion-icon slot="start" name="close-circle-outline"></ion-icon>
                 {% trans "Cancel" %}
             </ion-button>
@@ -169,75 +199,6 @@
             {% endif %}
         </div>
     </div>
-</div>
-
-<script>
-// Register globally for HTMX compatibility
-window.invoiceDetailApp = function() {
-    return {
-        async issueInvoice() {
-            if (!confirm('{% trans "Issue this invoice? This action cannot be undone." %}')) return;
-
-            try {
-                const response = await fetch('{% url "invoicing:invoice_issue" invoice.id %}', {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-                    }
-                });
-                const data = await response.json();
-                if (data.success) {
-                    this.showToast(data.message, 'success');
-                    setTimeout(() => htmx.ajax('GET', '{% url "invoicing:invoice_detail" invoice.id %}', {target: '#dashboard-content'}), 1000);
-                } else {
-                    this.showToast(data.error, 'danger');
-                }
-            } catch (error) {
-                this.showToast('{% trans "Error issuing invoice" %}', 'danger');
-            }
-        },
-
-        async cancelInvoice() {
-            if (!confirm('{% trans "Cancel this invoice? This action cannot be undone." %}')) return;
-
-            try {
-                const response = await fetch('{% url "invoicing:invoice_cancel" invoice.id %}', {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-                    }
-                });
-                const data = await response.json();
-                if (data.success) {
-                    this.showToast(data.message, 'warning');
-                    setTimeout(() => htmx.ajax('GET', '{% url "invoicing:invoice_detail" invoice.id %}', {target: '#dashboard-content'}), 1000);
-                } else {
-                    this.showToast(data.error, 'danger');
-                }
-            } catch (error) {
-                this.showToast('{% trans "Error cancelling invoice" %}', 'danger');
-            }
-        },
-
-        async showToast(message, color = 'primary') {
-            const toast = document.createElement('ion-toast');
-            toast.message = message;
-            toast.duration = 2000;
-            toast.color = color;
-            toast.position = 'top';
-            document.body.appendChild(toast);
-            await toast.present();
-        }
-    }
-};
-
-// Re-initialize Alpine after HTMX settles (ensures scripts have executed)
-document.addEventListener('htmx:afterSettle', function(event) {
-    if (event.detail.target.id === 'dashboard-content') {
-        const alpineEl = event.detail.target.querySelector('[x-data]');
-        if (alpineEl && !alpineEl._x_dataStack) {
-            Alpine.initTree(alpineEl);
-        }
-    }
-});
-</script>
+        </div>
+    {% endfill %}
+{% endcomponent %}

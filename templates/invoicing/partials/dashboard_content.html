@@ -1,60 +1,60 @@
 {% load i18n ui component_tags %}
 
-{% if request.htmx %}
-{% component "tabbar" module_id="invoicing" current_view="dashboard" oob=True %}{% endcomponent %}
-{% endif %}
+{% component "page"
+    title=_("Invoicing")
+    subtitle=_("Invoice management and billing")
+    module_id="invoicing"
+    tabbar_view="dashboard" %}
 
-{% ui_page_header title=_("Invoicing") subtitle=_("Invoice management and billing") %}
-
-<div class="ion-padding">
-
-    <!-- Stats Cards -->
-    <ion-row class="mb-md">
-        <ion-col size="6" size-md="3">
-            {% ui_stat_card value=total_invoices label=_("Total Invoices") icon="document-text-outline" color="primary" %}
-        </ion-col>
-        <ion-col size="6" size-md="3">
-            {% ui_stat_card value=month_invoices label=_("This Month") icon="calendar-outline" color="success" %}
-        </ion-col>
-        <ion-col size="6" size-md="3">
-            {% ui_stat_card value=month_total_formatted label=_("Month Total") icon="cash-outline" color="success" %}
-        </ion-col>
-        <ion-col size="6" size-md="3">
-            {% ui_stat_card value=pending_amount_formatted label=_("Pending") icon="time-outline" color="warning" %}
-        </ion-col>
-    </ion-row>
-
-    <!-- Quick Actions -->
-    {% ui_card title=_("Quick Actions") css_class="mb-md" %}
-        <ion-row>
-            <ion-col size="6">
-                <ion-button expand="block"
-                    hx-get="{% url 'invoicing:invoice_create' %}"
-                    hx-target="#main-content-area"
-                    hx-push-url="true">
-                    <ion-icon slot="start" name="add-outline"></ion-icon>
-                    {% trans "New Invoice" %}
-                </ion-button>
+    {% fill "content" %}
+        <!-- Stats Cards -->
+        <ion-row class="mb-md">
+            <ion-col size="6" size-md="3">
+                {% ui_stat_card value=total_invoices label=_("Total Invoices") icon="document-text-outline" color="primary" %}
             </ion-col>
-            <ion-col size="6">
-                <ion-button expand="block" fill="outline"
-                    hx-get="{% url 'invoicing:invoices' %}"
-                    hx-target="#main-content-area"
-                    hx-push-url="true">
-                    <ion-icon slot="start" name="list-outline"></ion-icon>
-                    {% trans "View Invoices" %}
-                </ion-button>
+            <ion-col size="6" size-md="3">
+                {% ui_stat_card value=month_invoices label=_("This Month") icon="calendar-outline" color="success" %}
+            </ion-col>
+            <ion-col size="6" size-md="3">
+                {% ui_stat_card value=month_total_formatted label=_("Month Total") icon="cash-outline" color="success" %}
+            </ion-col>
+            <ion-col size="6" size-md="3">
+                {% ui_stat_card value=pending_amount_formatted label=_("Pending") icon="time-outline" color="warning" %}
             </ion-col>
         </ion-row>
-    {% endui_card %}
 
-    <!-- Info Section -->
-    <div class="p-md rounded-md" style="background: var(--ion-color-step-50);">
-        <div class="d-flex align-start gap-xs">
-            <ion-icon name="information-circle-outline" class="text-primary" style="font-size: 20px; margin-top: 2px;"></ion-icon>
-            <p class="fs-sm text-secondary m-0">
-                {% trans "Create and manage invoices for your sales. Configure invoice series in Settings to customize invoice numbering." %}
-            </p>
+        <!-- Quick Actions -->
+        {% ui_card title=_("Quick Actions") css_class="mb-md" %}
+            <ion-row>
+                <ion-col size="6">
+                    <ion-button expand="block"
+                        hx-get="{% url 'invoicing:invoice_create' %}"
+                        hx-target="#main-content-area"
+                        hx-push-url="true">
+                        <ion-icon slot="start" name="add-outline"></ion-icon>
+                        {% trans "New Invoice" %}
+                    </ion-button>
+                </ion-col>
+                <ion-col size="6">
+                    <ion-button expand="block" fill="outline"
+                        hx-get="{% url 'invoicing:invoices' %}"
+                        hx-target="#main-content-area"
+                        hx-push-url="true">
+                        <ion-icon slot="start" name="list-outline"></ion-icon>
+                        {% trans "View Invoices" %}
+                    </ion-button>
+                </ion-col>
+            </ion-row>
+        {% endui_card %}
+
+        <!-- Info Section -->
+        <div class="p-md rounded-md" style="background: var(--ion-color-step-50);">
+            <div class="d-flex align-start gap-xs">
+                <ion-icon name="information-circle-outline" class="text-primary" style="font-size: 20px; margin-top: 2px;"></ion-icon>
+                <p class="fs-sm text-secondary m-0">
+                    {% trans "Create and manage invoices for your sales. Configure invoice series in Settings to customize invoice numbering." %}
+                </p>
+            </div>
         </div>
-    </div>
-</div>
+    {% endfill %}
+{% endcomponent %}

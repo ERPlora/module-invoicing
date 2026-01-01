@@ -1,13 +1,37 @@
 {% load static i18n ui component_tags %}
 
-{% if request.htmx %}
-{% component "tabbar" module_id="invoicing" current_view="series" oob=True %}{% endcomponent %}
-{% endif %}
+{# Toast listener for HX-Trigger events #}
+<script>
+(function() {
+    if (!window._invoicingToastListenerAdded) {
+        window._invoicingToastListenerAdded = true;
+        document.body.addEventListener('showToast', function(e) {
+            var detail = e.detail || {};
+            var message = detail.message || 'Done';
+            var color = detail.color || 'success';
 
-{% ui_page_header title=_("Invoice Series") action_icon="add-outline" action_label=_("New Series") action_hx_get="/modules/invoicing/series/create/" action_hx_target="#main-content-area" action_hx_push_url="true" %}
+            var toast = document.createElement('ion-toast');
+            toast.message = message;
+            toast.duration = 2000;
+            toast.position = 'top';
+            toast.color = color;
+            document.body.appendChild(toast);
+            toast.present();
+        });
+    }
+})();
+</script>
 
-{% csrf_token %}
-<div x-data="seriesApp()" class="ion-padding">
+{% component "page"
+    title=_("Invoice Series")
+    module_id="invoicing"
+    tabbar_view="series"
+    action_icon="add-outline"
+    action_label=_("New Series")
+    action_url="/modules/invoicing/series/create/" %}
+
+    {% fill "content" %}
+        {% csrf_token %}
 
     <!-- Series List -->
     <ion-card class="m-0">
@@ -39,7 +63,10 @@
                             <ion-icon slot="icon-only" name="create-outline"></ion-icon>
                         </ion-button>
                         <ion-button fill="clear" color="danger" size="small"
-                            @click="deleteSeries({{ series.id }}, '{{ series.prefix }}')">
+                            hx-delete="{% url 'invoicing:series_delete' series.id %}"
+                            hx-target="#main-content-area"
+                            hx-confirm="{% trans 'Delete series' %} {{ series.prefix }}? {% trans 'This action cannot be undone.' %}"
+                            hx-include="[name='csrfmiddlewaretoken']">
                             <ion-icon slot="icon-only" name="trash-outline"></ion-icon>
                         </ion-button>
                     </div>
@@ -65,53 +92,5 @@
             </p>
         </div>
     </div>
-</div>
-
-<script>
-// Register globally for HTMX compatibility
-window.seriesApp = function() {
-    return {
-        async deleteSeries(id, prefix) {
-            if (!confirm(`{% trans "Delete series" %} ${prefix}? {% trans "This action cannot be undone." %}`)) return;
-
-            try {
-                const response = await fetch(`/modules/invoicing/series/${id}/delete/`, {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-                    }
-                });
-                const data = await response.json();
-                if (data.success) {
-                    this.showToast(data.message, 'success');
-                    setTimeout(() => htmx.ajax('GET', '{% url "invoicing:series" %}', {target: '#dashboard-content'}), 1000);
-                } else {
-                    this.showToast(data.error, 'danger');
-                }
-            } catch (error) {
-                this.showToast('{% trans "Error deleting series" %}', 'danger');
-            }
-        },
-
-        async showToast(message, color = 'primary') {
-            const toast = document.createElement('ion-toast');
-            toast.message = message;
-            toast.duration = 2000;
-            toast.color = color;
-            toast.position = 'top';
-            document.body.appendChild(toast);
-            await toast.present();
-        }
-    }
-};
-
-// Re-initialize Alpine after HTMX settles (ensures scripts have executed)
-document.addEventListener('htmx:afterSettle', function(event) {
-    if (event.detail.target.id === 'dashboard-content') {
-        const alpineEl = event.detail.target.querySelector('[x-data]');
-        if (alpineEl && !alpineEl._x_dataStack) {
-            Alpine.initTree(alpineEl);
-        }
-    }
-});
-</script>
+    {% endfill %}
+{% endcomponent %}

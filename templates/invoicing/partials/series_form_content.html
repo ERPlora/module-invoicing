@@ -1,21 +1,41 @@
 {% load static i18n ui component_tags %}
 
-{% if request.htmx %}
-{% component "tabbar" module_id="invoicing" current_view="series" oob=True %}{% endcomponent %}
-{% endif %}
+{# Toast listener for HX-Trigger events #}
+<script>
+(function() {
+    if (!window._invoicingToastListenerAdded) {
+        window._invoicingToastListenerAdded = true;
+        document.body.addEventListener('showToast', function(e) {
+            var detail = e.detail || {};
+            var message = detail.message || 'Done';
+            var color = detail.color || 'success';
 
-{% if series %}
-{% ui_page_header title=_("Edit Series") %}
-{% else %}
-{% ui_page_header title=_("New Series") %}
-{% endif %}
+            var toast = document.createElement('ion-toast');
+            toast.message = message;
+            toast.duration = 2000;
+            toast.position = 'top';
+            toast.color = color;
+            document.body.appendChild(toast);
+            toast.present();
+        });
+    }
+})();
+</script>
 
-{% csrf_token %}
-<div x-data="seriesFormApp()" class="ion-padding">
+{% with form_title=series|yesno:_("Edit Series"),_("New Series") %}
+{% component "page"
+    title=form_title
+    module_id="invoicing"
+    tabbar_view="series" %}
 
+    {% fill "content" %}
     <ion-card class="m-0">
         <ion-card-content>
-            <form id="series-form" method="POST">
+            <form id="series-form"
+                  method="POST"
+                  hx-post=""
+                  hx-target="#main-content-area"
+                  hx-push-url="{% url 'invoicing:series' %}">
                 {% csrf_token %}
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <ion-item>
@@ -90,58 +110,30 @@
                         </ion-toggle>
                     </div>
                 </div>
+
+                <!-- Action Buttons -->
+                <div class="mt-6 flex gap-3">
+                    <ion-button
+                        hx-get="{% url 'invoicing:series' %}"
+                        hx-target="#main-content-area"
+                        hx-push-url="true"
+                        fill="outline"
+                        expand="block"
+                        class="flex-1">
+                        {% trans "Cancel" %}
+                    </ion-button>
+                    <ion-button
+                        type="submit"
+                        expand="block"
+                        color="primary"
+                        class="flex-1">
+                        <ion-icon slot="start" name="save-outline"></ion-icon>
+                        {% trans "Save" %}
+                    </ion-button>
+                </div>
             </form>
         </ion-card-content>
     </ion-card>
-</div>
-
-<script>
-// Register globally for HTMX compatibility
-window.seriesFormApp = function() {
-    return {
-        async saveSeries() {
-            const form = document.getElementById('series-form');
-            const formData = new FormData(form);
-
-            try {
-                const response = await fetch(window.location.href, {
-                    method: 'POST',
-                    body: formData
-                });
-
-                const data = await response.json();
-                if (data.success) {
-                    this.showToast(data.message, 'success');
-                    setTimeout(() => {
-                        htmx.ajax('GET', '{% url "invoicing:series" %}', {target: '#dashboard-content'});
-                    }, 500);
-                } else {
-                    this.showToast(data.error, 'danger');
-                }
-            } catch (error) {
-                this.showToast('{% trans "Error saving series" %}', 'danger');
-            }
-        },
-
-        async showToast(message, color = 'primary') {
-            const toast = document.createElement('ion-toast');
-            toast.message = message;
-            toast.duration = 2000;
-            toast.color = color;
-            toast.position = 'top';
-            document.body.appendChild(toast);
-            await toast.present();
-        }
-    }
-};
-
-// Re-initialize Alpine after HTMX settles (ensures scripts have executed)
-document.addEventListener('htmx:afterSettle', function(event) {
-    if (event.detail.target.id === 'dashboard-content') {
-        const alpineEl = event.detail.target.querySelector('[x-data]');
-        if (alpineEl && !alpineEl._x_dataStack) {
-            Alpine.initTree(alpineEl);
-        }
-    }
-});
-</script>
+    {% endfill %}
+{% endcomponent %}
+{% endwith %}
