@@ -13,6 +13,15 @@ MODULE_ICON = "document-text-outline"
 MODULE_VERSION = "1.0.0"
 MODULE_CATEGORY = "accounting"
 
+# Target Industries (business verticals this module is designed for)
+MODULE_INDUSTRIES = [
+    "retail",       # Retail stores
+    "wholesale",    # Wholesale distributors
+    "restaurant",   # Restaurants
+    "professional", # Professional services
+    "manufacturing",# Manufacturing
+]
+
 # Sidebar Menu Configuration
 MENU = {
     "label": _("Invoicing"),
