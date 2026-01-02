@@ -18,7 +18,7 @@ MODULE_INDUSTRIES = [
     "retail",       # Retail stores
     "wholesale",    # Wholesale distributors
     "restaurant",   # Restaurants
-    "professional", # Professional services
+    "consulting",   # Professional services
     "manufacturing",# Manufacturing
 ]
 
