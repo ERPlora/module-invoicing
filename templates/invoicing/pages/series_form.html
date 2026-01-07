@@ -1,8 +1,11 @@
-{% extends "dashboard/layout.html" %}
+{% extends "ui/app_base.html" %}
 {% load static %}
 {% load i18n %}
 
-{% block page_title %}{% if series %}{% trans "Edit Series" %}{% else %}{% trans "New Series" %}{% endif %}{% endblock %}
+{% block page_title %}
+    {% if series %}{% trans "Edit Series" %}
+    {% else %}{% trans "New Series" %}{% endif %}
+{% endblock %}
 
 {% block content %}
 {% with current_section="invoicing" section_title=_("Invoicing") %}
@@ -10,12 +13,8 @@
 {% endwith %}
 {% endblock %}
 
-{% block section_tabbar %}
-<ion-footer>
-{% include "invoicing/partials/tabbar.html" with current_view='series' %}
-</ion-footer>
-{% endblock %}
+{# Tabbar is now automatically rendered by app_base.html using module_id from context #}
 
-{% block dashboard_content %}
+{% block page_content %}
 {% include "invoicing/partials/series_form_content.html" %}
 {% endblock %}

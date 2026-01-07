@@ -21,6 +21,8 @@ def dashboard(request):
     """
     Main invoicing dashboard with stats.
     """
+    from apps.core.services.currency_service import format_currency
+
     today = timezone.now().date()
     current_month = today.replace(day=1)
 
@@ -43,8 +45,8 @@ def dashboard(request):
         'page_title': _('Facturación'),
         'total_invoices': total_invoices,
         'month_invoices': month_invoices,
-        'month_total': month_total,
-        'pending_amount': pending_amount,
+        'month_total_formatted': format_currency(month_total),
+        'pending_amount_formatted': format_currency(pending_amount),
     }
 
 
@@ -55,11 +57,10 @@ def dashboard(request):
 @require_http_methods(["GET"])
 def invoices_list(request):
     """
-    List all invoices with filters.
-
-    Note: This view has special HTMX handling for table-only updates,
-    so we don't use @htmx_view decorator here.
+    List all invoices with filters and infinite scroll.
     """
+    from apps.core.htmx import InfiniteScrollPaginator
+
     search = request.GET.get('search', '').strip()
     status_filter = request.GET.get('status', '')
     date_from = request.GET.get('date_from', '')
@@ -84,24 +85,44 @@ def invoices_list(request):
             Q(customer_tax_id__icontains=search)
         )
 
-    invoices = invoices.order_by('-issue_date', '-created_at')[:100]
+    invoices = invoices.order_by('-issue_date', '-created_at')
+
+    # Pagination with infinite scroll
+    per_page = int(request.GET.get('per_page', 25))
+    paginator = InfiniteScrollPaginator(invoices, per_page=per_page)
+    page_data = paginator.get_page(request.GET.get('page', 1))
 
     context = {
         'page_title': _('Facturas'),
-        'invoices': invoices,
+        'invoices': page_data['items'],
+        'has_next': page_data['has_next'],
+        'next_page': page_data['next_page'],
+        'total_count': page_data['total_count'],
+        'page_number': page_data['page_number'],
+        'search': search,
+        'status_filter': status_filter,
+        'date_from': date_from,
+        'date_to': date_to,
+        'per_page': per_page,
     }
+
+    # Determine which template to render
+    is_htmx = request.headers.get('HX-Request') or request.GET.get('partial') == 'true'
+    page_num = page_data['page_number']
 
     # HTMX partial for table only (filters use this target)
     if request.headers.get('HX-Target') == 'invoices-table-container':
         return render(request, 'invoicing/partials/invoices_table.html', context)
 
-    # Check if partial requested via HTMX or ?partial=true query param
-    is_partial = request.headers.get('HX-Request') or request.GET.get('partial') == 'true'
+    if not is_htmx:
+        return render(request, 'invoicing/pages/invoices.html', context)
 
-    if is_partial:
-        return render(request, 'invoicing/partials/invoices_content.html', context)
+    if page_num > 1:
+        # Subsequent pages - only return table rows + loader
+        return render(request, 'invoicing/partials/invoices_rows_infinite.html', context)
 
-    return render(request, 'invoicing/pages/invoices.html', context)
+    # First HTMX request - return full content partial
+    return render(request, 'invoicing/partials/invoices_content.html', context)
 
 
 @require_http_methods(["GET"])
@@ -254,56 +275,98 @@ def invoice_create(request):
 def invoice_issue(request, invoice_id):
     """
     Issue a draft invoice (assign number and change status).
+    Supports both HTMX and JSON responses.
     """
+    invoice = get_object_or_404(Invoice, id=invoice_id)
+    is_htmx = request.headers.get('HX-Request')
+
+    if invoice.status != Invoice.Status.DRAFT:
+        error_msg = _('Solo se pueden emitir facturas en borrador')
+        if is_htmx:
+            response = HttpResponse(status=400)
+            response['HX-Trigger'] = f'{{"showToast": {{"message": "{error_msg}", "color": "danger"}}}}'
+            return response
+        return JsonResponse({'success': False, 'error': error_msg})
+
     try:
-        invoice = get_object_or_404(Invoice, id=invoice_id)
-
-        if invoice.status != Invoice.Status.DRAFT:
-            return JsonResponse({
-                'success': False,
-                'error': _('Solo se pueden emitir facturas en borrador')
-            })
-
         # Generate number and issue
         invoice.number = invoice.series.get_next_number()
         invoice.status = Invoice.Status.ISSUED
         invoice.issue_date = timezone.now().date()
         invoice.save()
 
+        success_msg = _('Factura emitida correctamente')
+
+        if is_htmx:
+            # Return updated invoice detail partial
+            config = InvoicingConfig.get_config()
+            response = render(request, 'invoicing/partials/invoice_detail_content.html', {
+                'invoice': invoice,
+                'config': config,
+            })
+            response['HX-Trigger'] = f'{{"showToast": {{"message": "{success_msg}", "color": "success"}}}}'
+            return response
+
         return JsonResponse({
             'success': True,
-            'message': _('Factura emitida correctamente'),
+            'message': success_msg,
             'number': invoice.number
         })
 
     except Exception as e:
-        return JsonResponse({'success': False, 'error': str(e)})
+        error_msg = str(e)
+        if is_htmx:
+            response = HttpResponse(status=500)
+            response['HX-Trigger'] = f'{{"showToast": {{"message": "{error_msg}", "color": "danger"}}}}'
+            return response
+        return JsonResponse({'success': False, 'error': error_msg})
 
 
 @require_http_methods(["POST"])
 def invoice_cancel(request, invoice_id):
     """
     Cancel an invoice.
+    Supports both HTMX and JSON responses.
     """
+    invoice = get_object_or_404(Invoice, id=invoice_id)
+    is_htmx = request.headers.get('HX-Request')
+
+    if invoice.status == Invoice.Status.CANCELLED:
+        error_msg = _('La factura ya está anulada')
+        if is_htmx:
+            response = HttpResponse(status=400)
+            response['HX-Trigger'] = f'{{"showToast": {{"message": "{error_msg}", "color": "danger"}}}}'
+            return response
+        return JsonResponse({'success': False, 'error': error_msg})
+
     try:
-        invoice = get_object_or_404(Invoice, id=invoice_id)
-
-        if invoice.status == Invoice.Status.CANCELLED:
-            return JsonResponse({
-                'success': False,
-                'error': _('La factura ya está anulada')
-            })
-
         invoice.status = Invoice.Status.CANCELLED
         invoice.save()
 
+        success_msg = _('Factura anulada correctamente')
+
+        if is_htmx:
+            # Return updated invoice detail partial
+            config = InvoicingConfig.get_config()
+            response = render(request, 'invoicing/partials/invoice_detail_content.html', {
+                'invoice': invoice,
+                'config': config,
+            })
+            response['HX-Trigger'] = f'{{"showToast": {{"message": "{success_msg}", "color": "warning"}}}}'
+            return response
+
         return JsonResponse({
             'success': True,
-            'message': _('Factura anulada correctamente')
+            'message': success_msg
         })
 
     except Exception as e:
-        return JsonResponse({'success': False, 'error': str(e)})
+        error_msg = str(e)
+        if is_htmx:
+            response = HttpResponse(status=500)
+            response['HX-Trigger'] = f'{{"showToast": {{"message": "{error_msg}", "color": "danger"}}}}'
+            return response
+        return JsonResponse({'success': False, 'error': error_msg})
 
 
 @require_http_methods(["GET"])
@@ -453,40 +516,107 @@ def series_delete(request, series_id):
 # SETTINGS
 # =============================================================================
 
-@require_http_methods(["GET", "POST"])
+@require_http_methods(["GET"])
 @htmx_view('invoicing/pages/settings.html', 'invoicing/partials/settings_content.html')
 def settings_view(request):
     """
     Invoicing module settings.
     """
     config = InvoicingConfig.get_config()
-
-    if request.method == 'POST':
-        try:
-            config.company_name = request.POST.get('company_name', '').strip()
-            config.company_tax_id = request.POST.get('company_tax_id', '').strip()
-            config.company_address = request.POST.get('company_address', '').strip()
-            config.company_phone = request.POST.get('company_phone', '').strip()
-            config.company_email = request.POST.get('company_email', '').strip()
-            config.default_series = request.POST.get('default_series', 'F').strip()
-            config.auto_generate_invoice = request.POST.get('auto_generate_invoice') == 'on'
-            config.require_customer = request.POST.get('require_customer') == 'on'
-            config.invoice_footer = request.POST.get('invoice_footer', '').strip()
-            config.save()
-
-            return JsonResponse({
-                'success': True,
-                'message': _('Configuración guardada correctamente')
-            })
-
-        except Exception as e:
-            return JsonResponse({'success': False, 'error': str(e)})
-
-    # GET - show settings form
     series_list = InvoiceSeries.objects.filter(is_active=True)
+
+    # Build series options for setting_select component
+    series_options = [
+        {'value': s.prefix, 'label': f"{s.prefix} - {s.name}"}
+        for s in series_list
+    ]
+    if not series_options:
+        series_options = [{'value': 'F', 'label': 'F - Default'}]
 
     return {
         'page_title': _('Configuración'),
         'config': config,
-        'series_list': series_list,
+        'series_options': series_options,
     }
+
+
+@require_http_methods(["POST"])
+def settings_save(request):
+    """Save invoicing settings via JSON."""
+    try:
+        data = json.loads(request.body)
+        config = InvoicingConfig.get_config()
+
+        # Company Information
+        config.company_name = data.get('company_name', '').strip()
+        config.company_tax_id = data.get('company_tax_id', '').strip()
+        config.company_address = data.get('company_address', '').strip()
+        config.company_phone = data.get('company_phone', '').strip()
+        config.company_email = data.get('company_email', '').strip()
+
+        # Invoice Settings
+        config.default_series = data.get('default_series', 'F').strip()
+        config.auto_generate_invoice = data.get('auto_generate_invoice', False)
+        config.require_customer = data.get('require_customer', False)
+
+        # Invoice Footer
+        config.invoice_footer = data.get('invoice_footer', '').strip()
+
+        config.save()
+        return JsonResponse({'success': True, 'message': _('Settings saved')})
+
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': _('Invalid JSON')}, status=400)
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)
+
+
+@require_http_methods(["POST"])
+def settings_toggle(request):
+    """Toggle a boolean setting via HTMX."""
+    # Support both 'name'/'value' (new components) and 'setting_name'/'setting_value' (legacy)
+    name = request.POST.get('name') or request.POST.get('setting_name')
+    value = request.POST.get('value', request.POST.get('setting_value', 'false'))
+    setting_value = value == 'true' or value is True
+
+    config = InvoicingConfig.get_config()
+
+    # Only toggle boolean settings
+    boolean_settings = ['auto_generate_invoice', 'require_customer']
+    if name in boolean_settings:
+        setattr(config, name, setting_value)
+        config.save()
+
+    response = HttpResponse(status=204)
+    response['HX-Trigger'] = json.dumps({
+        'showToast': {'message': str(_('Setting updated')), 'color': 'success'}
+    })
+    return response
+
+
+@require_http_methods(["POST"])
+def settings_reset(request):
+    """Reset invoicing settings to defaults."""
+    config = InvoicingConfig.get_config()
+
+    # Reset to defaults
+    config.company_name = ''
+    config.company_tax_id = ''
+    config.company_address = ''
+    config.company_phone = ''
+    config.company_email = ''
+    config.default_series = 'F'
+    config.auto_generate_invoice = False
+    config.require_customer = False
+    config.invoice_footer = ''
+    config.save()
+
+    # Re-render the settings page
+    response = render(request, 'invoicing/partials/settings_content.html', {
+        'config': config,
+        'series_options': [{'value': s.prefix, 'label': s.name} for s in InvoiceSeries.objects.filter(is_active=True)],
+    })
+    response['HX-Trigger'] = json.dumps({
+        'showToast': {'message': str(_('Settings reset to defaults')), 'color': 'warning'}
+    })
+    return response
