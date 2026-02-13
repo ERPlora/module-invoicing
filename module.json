@@ -1,112 +1,30 @@
 {
-  "module_id": "invoicing",
-  "name": "Invoicing",
-  "name_es": "Facturación",
-  "version": "1.0.0",
-  "description": "Invoice and receipt management with series, tax handling, and PDF generation",
-  "description_es": "Gestión de facturas y recibos con series, manejo de impuestos y generación de PDF",
-  "author": "ERPlora",
-  "author_email": "support@erplora.com",
-  "license": "MIT",
-  "category": "accounting",
-  "tags": ["invoicing", "billing", "receipts", "accounting", "pdf", "tax", "documents"],
-  "icon": "document-text-outline",
-  "homepage": "https://github.com/ERPlora/module-invoicing",
-  "repository_url": "https://github.com/ERPlora/module-invoicing",
-  "documentation": "https://docs.erplora.com/modules/invoicing",
-
-  "dependencies": {
-    "python": [],
-    "modules": ["sales"]
-  },
-
-  "compatibility": {
-    "min_erplora_version": "1.0.0",
-    "max_erplora_version": "2.0.0"
-  },
-
-  "features": {
-    "i18n": true,
-    "languages": ["en", "es"],
-    "api": true,
-    "webhooks": false,
-    "background_tasks": false,
-    "supports_export": true,
-    "supports_import": false
-  },
-
-  "permissions": [
-    "invoicing.view_invoice",
-    "invoicing.add_invoice",
-    "invoicing.change_invoice",
-    "invoicing.delete_invoice",
-    "invoicing.view_invoiceseries",
-    "invoicing.add_invoiceseries",
-    "invoicing.change_invoiceseries",
-    "invoicing.delete_invoiceseries"
-  ],
-
-  "menu": {
-    "label": "Invoicing",
-    "label_es": "Facturación",
+    "id": "invoicing",
+    "name": "Invoicing",
+    "version": "2.0.0",
+    "description": "Invoice and receipt management with series, tax handling, and print support",
     "icon": "document-text-outline",
-    "url": "/modules/invoicing/",
-    "order": 30
-  },
-
-  "settings": {
-    "default_series": {
-      "type": "string",
-      "default": "F",
-      "label": "Default Invoice Series",
-      "label_es": "Serie de Factura por Defecto",
-      "description": "Default prefix for invoice numbers",
-      "description_es": "Prefijo por defecto para números de factura"
+    "category": "accounting",
+    "requires": ["sales"],
+    "menu": {
+        "label": "Invoicing",
+        "icon": "document-text-outline",
+        "order": 30
     },
-    "auto_generate_invoice": {
-      "type": "boolean",
-      "default": false,
-      "label": "Auto-generate Invoice on Sale",
-      "label_es": "Generar Factura Automáticamente",
-      "description": "Automatically create invoice when a sale is completed",
-      "description_es": "Crear factura automáticamente al completar una venta"
-    },
-    "require_customer_for_invoice": {
-      "type": "boolean",
-      "default": true,
-      "label": "Require Customer for Invoice",
-      "label_es": "Requerir Cliente para Factura",
-      "description": "Customer data is required to generate an invoice",
-      "description_es": "Se requieren datos del cliente para generar una factura"
-    }
-  },
-
-  "api_endpoints": [
-    {"path": "/", "method": "GET", "description": "Invoice dashboard"},
-    {"path": "/invoices/", "method": "GET", "description": "List invoices"},
-    {"path": "/invoices/create/", "method": "POST", "description": "Create invoice"},
-    {"path": "/invoices/<id>/", "method": "GET", "description": "View invoice"},
-    {"path": "/invoices/<id>/pdf/", "method": "GET", "description": "Download PDF"},
-    {"path": "/series/", "method": "GET", "description": "List invoice series"},
-    {"path": "/settings/", "method": "GET", "description": "Module settings"}
-  ],
-
-  "database": {
-    "migrations": true,
-    "models": ["Invoice", "InvoiceLine", "InvoiceSeries", "InvoicingConfig"]
-  },
-
-  "changelog": {
-    "1.0.0": {
-      "date": "2025-12-25",
-      "changes": [
-        "Initial release",
-        "Invoice CRUD operations",
-        "Invoice series management",
-        "PDF generation with window.print()",
-        "Integration with sales module",
-        "Multi-language support (English/Spanish)"
-      ]
-    }
-  }
+    "navigation": [
+        {"id": "dashboard", "label": "Overview", "icon": "stats-chart-outline", "view": ""},
+        {"id": "invoices", "label": "Invoices", "icon": "document-text-outline", "view": "invoices"},
+        {"id": "series", "label": "Series", "icon": "layers-outline", "view": "series"},
+        {"id": "settings", "label": "Settings", "icon": "settings-outline", "view": "settings"}
+    ],
+    "permissions": [
+        "invoicing.view_invoice",
+        "invoicing.add_invoice",
+        "invoicing.change_invoice",
+        "invoicing.delete_invoice",
+        "invoicing.view_series",
+        "invoicing.manage_series",
+        "invoicing.view_settings",
+        "invoicing.change_settings"
+    ]
 }

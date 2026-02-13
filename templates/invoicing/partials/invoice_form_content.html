@@ -1,112 +1,213 @@
-{% load static %}
-{% load i18n %}
+{% load i18n djicons %}
 
-<!-- Tab bar update via OOB swap (only on HTMX navigation) -->
-<div id="dashboard-tabbar" hx-swap-oob="innerHTML">
-<ion-footer>
-{% include "invoicing/partials/tabbar.html" with current_view='invoices' %}
-</ion-footer>
-</div>
+<script>
+window.invoiceFormApp = function() {
+    return {
+        saving: false,
+        invoice: {
+            series_id: '{% for s in series_list %}{% if s.is_default %}{{ s.id }}{% endif %}{% endfor %}',
+            invoice_type: 'invoice',
+            customer_name: '',
+            customer_tax_id: '',
+            customer_address: '',
+            customer_email: '',
+            customer_phone: '',
+            tax_rate: 21,
+            notes: '',
+            lines: []
+        },
+        totals: { subtotal: 0, tax: 0, total: 0 },
+
+        init() {
+            this.addLine();
+        },
+
+        addLine() {
+            this.invoice.lines.push({
+                description: '', quantity: 1, unit_price: 0,
+                discount: 0, tax_rate: this.invoice.tax_rate, sku: ''
+            });
+        },
+
+        removeLine(index) {
+            this.invoice.lines.splice(index, 1);
+            this.calculateTotals();
+        },
+
+        getLineTotal(line) {
+            const sub = line.quantity * line.unit_price;
+            return sub - (sub * line.discount / 100);
+        },
+
+        calculateTotals() {
+            this.totals.subtotal = this.invoice.lines.reduce((s, l) => s + this.getLineTotal(l), 0);
+            this.totals.tax = this.totals.subtotal * (this.invoice.tax_rate / 100);
+            this.totals.total = this.totals.subtotal + this.totals.tax;
+        },
+
+        async saveInvoice() {
+            if (!this.invoice.series_id) { alert('{% trans "Please select an invoice series" %}'); return; }
+            if (!this.invoice.customer_name) { alert('{% trans "Customer name is required" %}'); return; }
+            const validLines = this.invoice.lines.filter(l => l.description.trim());
+            if (validLines.length === 0) { alert('{% trans "At least one item is required" %}'); return; }
+
+            this.saving = true;
+            const fd = new FormData();
+            fd.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+            fd.append('series_id', this.invoice.series_id);
+            fd.append('invoice_type', this.invoice.invoice_type);
+            fd.append('customer_name', this.invoice.customer_name);
+            fd.append('customer_tax_id', this.invoice.customer_tax_id);
+            fd.append('customer_address', this.invoice.customer_address);
+            fd.append('customer_email', this.invoice.customer_email);
+            fd.append('customer_phone', this.invoice.customer_phone);
+            fd.append('tax_rate', this.invoice.tax_rate);
+            fd.append('notes', this.invoice.notes);
+
+            validLines.forEach((line, i) => {
+                fd.append(`line_${i}_description`, line.description);
+                fd.append(`line_${i}_quantity`, line.quantity);
+                fd.append(`line_${i}_unit_price`, line.unit_price);
+                fd.append(`line_${i}_discount`, line.discount);
+                fd.append(`line_${i}_tax_rate`, line.tax_rate || this.invoice.tax_rate);
+                fd.append(`line_${i}_sku`, line.sku || '');
+            });
+
+            try {
+                const resp = await fetch('{% url "invoicing:invoice_create" %}', {
+                    method: 'POST', body: fd
+                });
+                const data = await resp.json();
+                if (data.ok && data.id) {
+                    htmx.ajax('GET', '{% url "invoicing:invoices" %}' + data.id + '/', '#main-content-area');
+                } else {
+                    alert(data.error || '{% trans "Error saving invoice" %}');
+                }
+            } catch (e) {
+                alert('{% trans "Error saving invoice" %}');
+            } finally {
+                this.saving = false;
+            }
+        }
+    }
+};
+</script>
 
 {% csrf_token %}
-<div x-data="invoiceFormApp()" class="ion-padding">
+<div x-data="invoiceFormApp()" class="p-4">
     <!-- Page Header -->
     <div class="flex justify-between items-center mb-6">
         <div class="flex items-center gap-4">
-            <ion-button fill="clear"
+            <button class="btn btn-ghost"
                 hx-get="{% url 'invoicing:invoices' %}"
-                hx-target="#dashboard-content"
+                hx-target="#main-content-area"
                 hx-push-url="true">
-                <ion-icon slot="icon-only" name="arrow-back-outline"></ion-icon>
-            </ion-button>
+                {% icon "arrow-back-outline" %}
+            </button>
             <div>
-                <h1 class="text-2xl font-bold" style="color: var(--ion-text-color);">{% trans "New Invoice" %}</h1>
-                <p class="text-sm mt-1" style="color: var(--ion-color-medium);">{% trans "Create a new invoice" %}</p>
+                <h1 class="text-2xl font-bold">{% trans "New Invoice" %}</h1>
+                <p class="text-sm mt-1 text-base-content/60">{% trans "Create a new draft invoice" %}</p>
             </div>
         </div>
         <div class="flex gap-2">
-            <ion-button color="medium" fill="outline"
+            <button class="btn btn-outline"
                 hx-get="{% url 'invoicing:invoices' %}"
-                hx-target="#dashboard-content"
+                hx-target="#main-content-area"
                 hx-push-url="true">
                 {% trans "Cancel" %}
-            </ion-button>
-            <ion-button @click="saveInvoice()" color="success">
-                <ion-icon slot="start" name="save-outline"></ion-icon>
-                {% trans "Save Draft" %}
-            </ion-button>
+            </button>
+            <button class="btn color-success" @click="saveInvoice()" :disabled="saving">
+                {% icon "save-outline" %}
+                <span x-text="saving ? '{% trans "Saving..." %}' : '{% trans "Save Draft" %}'"></span>
+            </button>
         </div>
     </div>
+
+    {% if error %}
+    <div class="p-4 rounded-xl bg-error/10 text-error mb-4 flex items-center gap-2">
+        {% icon "alert-circle-outline" %}
+        <span>{{ error }}</span>
+    </div>
+    {% endif %}
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <!-- Main Form -->
         <div class="lg:col-span-2">
-            <!-- Customer Info -->
-            <ion-card class="m-0 mb-4">
-                <ion-card-header>
-                    <ion-card-title>{% trans "Customer Information" %}</ion-card-title>
-                </ion-card-header>
-                <ion-card-content>
+            <!-- Invoice Settings -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h3 class="card-title">{% icon "settings-outline" css_class="text-primary" %} {% trans "Invoice Settings" %}</h3>
+                </div>
+                <div class="card-body">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <ion-item>
-                            <ion-input
-                                label="{% trans 'Customer Name' %} *"
-                                label-placement="stacked"
-                                x-model="invoice.customer_name"
-                                required>
-                            </ion-input>
-                        </ion-item>
-                        <ion-item>
-                            <ion-input
-                                label="{% trans 'Tax ID (NIF/CIF)' %}"
-                                label-placement="stacked"
-                                x-model="invoice.customer_tax_id">
-                            </ion-input>
-                        </ion-item>
-                        <ion-item class="md:col-span-2">
-                            <ion-textarea
-                                label="{% trans 'Address' %}"
-                                label-placement="stacked"
-                                rows="2"
-                                x-model="invoice.customer_address">
-                            </ion-textarea>
-                        </ion-item>
-                        <ion-item>
-                            <ion-input
-                                label="{% trans 'Email' %}"
-                                label-placement="stacked"
-                                type="email"
-                                x-model="invoice.customer_email">
-                            </ion-input>
-                        </ion-item>
-                        <ion-item>
-                            <ion-input
-                                label="{% trans 'Phone' %}"
-                                label-placement="stacked"
-                                type="tel"
-                                x-model="invoice.customer_phone">
-                            </ion-input>
-                        </ion-item>
+                        <div class="form-group">
+                            <label class="form-group-label">{% trans "Series" %} *</label>
+                            <select class="select" x-model="invoice.series_id" required>
+                                <option value="">{% trans "Select series..." %}</option>
+                                {% for s in series_list %}
+                                <option value="{{ s.id }}" {% if s.is_default %}selected{% endif %}>{{ s.prefix }} - {{ s.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-group-label">{% trans "Type" %}</label>
+                            <select class="select" x-model="invoice.invoice_type">
+                                <option value="invoice">{% trans "Invoice" %}</option>
+                                <option value="simplified">{% trans "Simplified Invoice" %}</option>
+                                <option value="rectifying">{% trans "Rectifying Invoice" %}</option>
+                            </select>
+                        </div>
                     </div>
-                </ion-card-content>
-            </ion-card>
+                </div>
+            </div>
+
+            <!-- Customer Info -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h3 class="card-title">{% icon "person-outline" css_class="text-primary" %} {% trans "Customer Information" %}</h3>
+                </div>
+                <div class="card-body">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="form-group">
+                            <label class="form-group-label">{% trans "Customer Name" %} *</label>
+                            <input type="text" class="input" x-model="invoice.customer_name" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-group-label">{% trans "Tax ID (NIF/CIF)" %}</label>
+                            <input type="text" class="input" x-model="invoice.customer_tax_id">
+                        </div>
+                        <div class="form-group md:col-span-2">
+                            <label class="form-group-label">{% trans "Address" %}</label>
+                            <textarea class="textarea" rows="2" x-model="invoice.customer_address"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-group-label">{% trans "Email" %}</label>
+                            <input type="email" class="input" x-model="invoice.customer_email">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-group-label">{% trans "Phone" %}</label>
+                            <input type="tel" class="input" x-model="invoice.customer_phone">
+                        </div>
+                    </div>
+                </div>
+            </div>
 
             <!-- Invoice Lines -->
-            <ion-card class="m-0">
-                <ion-card-header>
+            <div class="card">
+                <div class="card-header">
                     <div class="flex justify-between items-center">
-                        <ion-card-title>{% trans "Items" %}</ion-card-title>
-                        <ion-button size="small" @click="addLine()">
-                            <ion-icon slot="start" name="add-outline"></ion-icon>
+                        <h3 class="card-title">{% icon "list-outline" css_class="text-primary" %} {% trans "Items" %}</h3>
+                        <button class="btn btn-sm color-primary" @click="addLine()">
+                            {% icon "add-outline" %}
                             {% trans "Add Item" %}
-                        </ion-button>
+                        </button>
                     </div>
-                </ion-card-header>
-                <ion-card-content class="p-0">
+                </div>
+                <div class="card-body p-0">
                     <div class="overflow-x-auto">
-                        <table class="w-full">
+                        <table class="w-full" x-show="invoice.lines.length > 0">
                             <thead>
-                                <tr style="background: var(--ion-color-light);">
+                                <tr class="bg-base-200/50">
                                     <th class="p-3 text-left text-sm font-medium" style="min-width: 200px;">{% trans "Description" %}</th>
                                     <th class="p-3 text-right text-sm font-medium" style="width: 80px;">{% trans "Qty" %}</th>
                                     <th class="p-3 text-right text-sm font-medium" style="width: 100px;">{% trans "Price" %}</th>
@@ -117,52 +218,34 @@
                             </thead>
                             <tbody>
                                 <template x-for="(line, index) in invoice.lines" :key="index">
-                                    <tr style="border-bottom: 1px solid var(--ion-border-color);">
+                                    <tr class="border-b border-base-200">
                                         <td class="p-2">
-                                            <ion-input
+                                            <input type="text" class="input input-sm"
                                                 x-model="line.description"
-                                                placeholder="{% trans 'Description' %}"
-                                                class="text-sm">
-                                            </ion-input>
+                                                placeholder="{% trans 'Item description' %}">
                                         </td>
                                         <td class="p-2">
-                                            <ion-input
-                                                type="number"
+                                            <input type="number" class="input input-sm text-right"
                                                 x-model.number="line.quantity"
-                                                min="1"
-                                                step="1"
-                                                class="text-sm text-right"
-                                                @ionChange="calculateTotals()">
-                                            </ion-input>
+                                                min="0.001" step="1" @input="calculateTotals()">
                                         </td>
                                         <td class="p-2">
-                                            <ion-input
-                                                type="number"
+                                            <input type="number" class="input input-sm text-right"
                                                 x-model.number="line.unit_price"
-                                                min="0"
-                                                step="0.01"
-                                                class="text-sm text-right"
-                                                @ionChange="calculateTotals()">
-                                            </ion-input>
+                                                min="0" step="0.01" @input="calculateTotals()">
                                         </td>
                                         <td class="p-2">
-                                            <ion-input
-                                                type="number"
+                                            <input type="number" class="input input-sm text-right"
                                                 x-model.number="line.discount"
-                                                min="0"
-                                                max="100"
-                                                step="1"
-                                                class="text-sm text-right"
-                                                @ionChange="calculateTotals()">
-                                            </ion-input>
+                                                min="0" max="100" step="1" @input="calculateTotals()">
                                         </td>
                                         <td class="p-2 text-right font-medium">
-                                            €<span x-text="getLineTotal(line).toFixed(2)"></span>
+                                            <span x-text="getLineTotal(line).toFixed(2)"></span>
                                         </td>
                                         <td class="p-2 text-center">
-                                            <ion-button fill="clear" color="danger" size="small" @click="removeLine(index)">
-                                                <ion-icon slot="icon-only" name="trash-outline"></ion-icon>
-                                            </ion-button>
+                                            <button class="btn btn-ghost btn-sm text-error" @click="removeLine(index)">
+                                                {% icon "trash-outline" %}
+                                            </button>
                                         </td>
                                     </tr>
                                 </template>
@@ -172,181 +255,64 @@
 
                     <!-- Empty State -->
                     <div x-show="invoice.lines.length === 0" class="text-center py-8">
-                        <ion-icon name="document-text-outline" style="font-size: 48px; color: var(--ion-color-medium);"></ion-icon>
-                        <p class="mt-2" style="color: var(--ion-color-medium);">{% trans "No items added" %}</p>
-                        <ion-button class="mt-4" size="small" @click="addLine()">
-                            <ion-icon slot="start" name="add-outline"></ion-icon>
+                        {% icon "document-text-outline" css_class="text-5xl text-base-content/60" %}
+                        <p class="mt-2 text-base-content/60">{% trans "No items added yet" %}</p>
+                        <button class="btn btn-sm color-primary mt-4" @click="addLine()">
+                            {% icon "add-outline" %}
                             {% trans "Add First Item" %}
-                        </ion-button>
+                        </button>
                     </div>
-                </ion-card-content>
-            </ion-card>
+                </div>
+            </div>
         </div>
 
         <!-- Summary Sidebar -->
         <div>
-            <ion-card class="m-0 mb-4">
-                <ion-card-header>
-                    <ion-card-title>{% trans "Summary" %}</ion-card-title>
-                </ion-card-header>
-                <ion-card-content>
+            <!-- Totals -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h3 class="card-title">{% trans "Summary" %}</h3>
+                </div>
+                <div class="card-body">
                     <div class="space-y-3">
                         <div class="flex justify-between">
-                            <span class="text-medium">{% trans "Subtotal" %}</span>
-                            <span>€<span x-text="totals.subtotal.toFixed(2)"></span></span>
+                            <span class="text-base-content/60">{% trans "Subtotal" %}</span>
+                            <span x-text="totals.subtotal.toFixed(2)"></span>
                         </div>
                         <div class="flex justify-between items-center">
-                            <span class="text-medium">{% trans "Tax" %}</span>
+                            <span class="text-base-content/60">{% trans "Tax" %}</span>
                             <div class="flex items-center gap-2">
-                                <ion-input
-                                    type="number"
+                                <input type="number" class="input input-sm text-right"
                                     x-model.number="invoice.tax_rate"
-                                    min="0"
-                                    max="100"
-                                    step="1"
-                                    style="width: 60px;"
-                                    class="text-right"
-                                    @ionChange="calculateTotals()">
-                                </ion-input>
+                                    min="0" max="100" step="1" style="width: 60px;"
+                                    @input="calculateTotals()">
                                 <span>%</span>
                             </div>
                         </div>
                         <div class="flex justify-between">
-                            <span class="text-medium">{% trans "Tax Amount" %}</span>
-                            <span>€<span x-text="totals.tax.toFixed(2)"></span></span>
+                            <span class="text-base-content/60">{% trans "Tax Amount" %}</span>
+                            <span x-text="totals.tax.toFixed(2)"></span>
                         </div>
-                        <div style="height: 1px; background: var(--ion-border-color);"></div>
+                        <hr class="border-base-200">
                         <div class="flex justify-between text-lg font-bold">
                             <span>{% trans "Total" %}</span>
-                            <span>€<span x-text="totals.total.toFixed(2)"></span></span>
+                            <span x-text="totals.total.toFixed(2)"></span>
                         </div>
                     </div>
-                </ion-card-content>
-            </ion-card>
+                </div>
+            </div>
 
-            <ion-card class="m-0">
-                <ion-card-header>
-                    <ion-card-title>{% trans "Notes" %}</ion-card-title>
-                </ion-card-header>
-                <ion-card-content>
-                    <ion-textarea
-                        rows="4"
+            <!-- Notes -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">{% trans "Notes" %}</h3>
+                </div>
+                <div class="card-body">
+                    <textarea class="textarea" rows="4"
                         placeholder="{% trans 'Optional notes for the invoice...' %}"
-                        x-model="invoice.notes">
-                    </ion-textarea>
-                </ion-card-content>
-            </ion-card>
+                        x-model="invoice.notes"></textarea>
+                </div>
+            </div>
         </div>
     </div>
 </div>
-
-<script>
-// Register globally so HTMX can find it after swap
-window.invoiceFormApp = function() {
-    return {
-        invoice: {
-            customer_name: '',
-            customer_tax_id: '',
-            customer_address: '',
-            customer_email: '',
-            customer_phone: '',
-            tax_rate: {{ config.default_tax_rate|default:21 }},
-            notes: '',
-            lines: []
-        },
-        totals: {
-            subtotal: 0,
-            tax: 0,
-            total: 0
-        },
-
-        init() {
-            this.addLine();
-        },
-
-        addLine() {
-            this.invoice.lines.push({
-                description: '',
-                quantity: 1,
-                unit_price: 0,
-                discount: 0,
-                tax_rate: this.invoice.tax_rate
-            });
-        },
-
-        removeLine(index) {
-            this.invoice.lines.splice(index, 1);
-            this.calculateTotals();
-        },
-
-        getLineTotal(line) {
-            const subtotal = line.quantity * line.unit_price;
-            const discount = subtotal * (line.discount / 100);
-            return subtotal - discount;
-        },
-
-        calculateTotals() {
-            this.totals.subtotal = this.invoice.lines.reduce((sum, line) => {
-                return sum + this.getLineTotal(line);
-            }, 0);
-            this.totals.tax = this.totals.subtotal * (this.invoice.tax_rate / 100);
-            this.totals.total = this.totals.subtotal + this.totals.tax;
-        },
-
-        async saveInvoice() {
-            if (!this.invoice.customer_name) {
-                this.showToast('{% trans "Customer name is required" %}', 'warning');
-                return;
-            }
-
-            if (this.invoice.lines.length === 0 || !this.invoice.lines.some(l => l.description)) {
-                this.showToast('{% trans "At least one item is required" %}', 'warning');
-                return;
-            }
-
-            try {
-                const response = await fetch('{% url "invoicing:invoice_create" %}', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-                    },
-                    body: JSON.stringify(this.invoice)
-                });
-
-                const data = await response.json();
-                if (data.success) {
-                    this.showToast(data.message, 'success');
-                    setTimeout(() => {
-                        htmx.ajax('GET', '/modules/invoicing/invoices/' + data.invoice_id + '/', {target: '#dashboard-content'});
-                    }, 500);
-                } else {
-                    this.showToast(data.error, 'danger');
-                }
-            } catch (error) {
-                this.showToast('{% trans "Error saving invoice" %}', 'danger');
-            }
-        },
-
-        async showToast(message, color = 'primary') {
-            const toast = document.createElement('ion-toast');
-            toast.message = message;
-            toast.duration = 2000;
-            toast.color = color;
-            toast.position = 'top';
-            document.body.appendChild(toast);
-            await toast.present();
-        }
-    }
-};
-
-// Re-initialize Alpine on this element after HTMX swap
-document.addEventListener('htmx:afterSwap', function(event) {
-    if (event.detail.target.id === 'dashboard-content') {
-        const alpineEl = event.detail.target.querySelector('[x-data]');
-        if (alpineEl && !alpineEl._x_dataStack) {
-            Alpine.initTree(alpineEl);
-        }
-    }
-});
-</script>

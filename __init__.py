@@ -1,1 +1,1 @@
-default_app_config = 'invoicing.apps.InvoicingConfig'
+default_app_config = 'modules.invoicing.apps.InvoicingConfig'

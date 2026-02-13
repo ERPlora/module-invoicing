@@ -1,66 +1,197 @@
-{% load i18n %}
+{% load i18n djicons %}
 
-<div class="overflow-x-auto">
-    <table class="w-full">
-        <thead>
-            <tr style="background: var(--ion-color-light);">
-                <th class="p-3 text-left text-sm font-medium">{% trans "Number" %}</th>
-                <th class="p-3 text-left text-sm font-medium">{% trans "Customer" %}</th>
-                <th class="p-3 text-left text-sm font-medium">{% trans "Date" %}</th>
-                <th class="p-3 text-right text-sm font-medium">{% trans "Total" %}</th>
-                <th class="p-3 text-center text-sm font-medium">{% trans "Status" %}</th>
-                <th class="p-3 text-center text-sm font-medium">{% trans "Actions" %}</th>
+{% if invoices %}
+
+<!-- Table View -->
+<div class="datatable-body">
+    <table class="datatable-table">
+        <thead class="datatable-thead">
+            <tr>
+                <th class="datatable-th datatable-th-checkbox">
+                    <label class="checkbox checkbox-sm">
+                        <input type="checkbox"
+                               :checked="selectAll"
+                               @click="toggleAll([{% for inv in invoices %}'{{ inv.id }}'{% if not forloop.last %},{% endif %}{% endfor %}])">
+                        <span class="checkbox-mark"></span>
+                    </label>
+                </th>
+                <th class="datatable-th">{% trans "Number" %}</th>
+                <th class="datatable-th">{% trans "Customer" %}</th>
+                <th class="datatable-th datatable-th-sortable{% if sort_field == 'date' %} datatable-th-sorted{% if sort_dir == 'desc' %} datatable-th-sorted-desc{% endif %}{% endif %}"
+                    hx-get="{% url 'invoicing:invoices' %}?sort=date&dir={% if sort_field == 'date' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}"
+                    hx-target="#datatable-body"
+                    hx-include="#invoices-datatable"
+                    style="cursor: pointer;">
+                    {% trans "Date" %}
+                    <span class="datatable-sort-icon">{% icon "chevron-up-outline" %}</span>
+                </th>
+                <th class="datatable-th">{% trans "Due Date" %}</th>
+                <th class="datatable-th datatable-th-sortable{% if sort_field == 'total' %} datatable-th-sorted{% if sort_dir == 'desc' %} datatable-th-sorted-desc{% endif %}{% endif %}"
+                    hx-get="{% url 'invoicing:invoices' %}?sort=total&dir={% if sort_field == 'total' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}"
+                    hx-target="#datatable-body"
+                    hx-include="#invoices-datatable"
+                    style="cursor: pointer;">
+                    {% trans "Total" %}
+                    <span class="datatable-sort-icon">{% icon "chevron-up-outline" %}</span>
+                </th>
+                <th class="datatable-th datatable-th-center">{% trans "Status" %}</th>
+                <th class="datatable-th datatable-th-actions">{% trans "Actions" %}</th>
             </tr>
         </thead>
-        <tbody>
+        <tbody class="datatable-tbody">
             {% for invoice in invoices %}
-            <tr style="border-bottom: 1px solid var(--ion-border-color);">
-                <td class="p-3">
-                    <span class="font-medium">{{ invoice.number|default:_("Draft") }}</span>
+            <tr class="datatable-tr"
+                data-id="{{ invoice.id }}"
+                :class="{ 'datatable-tr-selected': selectedIds.includes('{{ invoice.id }}') }">
+                <td class="datatable-td datatable-td-checkbox" onclick="event.stopPropagation();">
+                    <label class="checkbox checkbox-sm">
+                        <input type="checkbox"
+                               :checked="selectedIds.includes('{{ invoice.id }}')"
+                               @click="toggleSelect('{{ invoice.id }}')">
+                        <span class="checkbox-mark"></span>
+                    </label>
                 </td>
-                <td class="p-3">
-                    <div>{{ invoice.customer_name }}</div>
-                    {% if invoice.customer_tax_id %}
-                    <div class="text-xs" style="color: var(--ion-color-medium);">{{ invoice.customer_tax_id }}</div>
+                <td class="datatable-td" data-label="{% trans 'Number' %}">
+                    <span class="font-medium">{{ invoice.number|default:"Draft" }}</span>
+                    {% if invoice.invoice_type != 'invoice' %}
+                    <span class="badge badge-sm ml-1">{{ invoice.get_invoice_type_display }}</span>
                     {% endif %}
                 </td>
-                <td class="p-3">{{ invoice.issue_date|date:"Y-m-d" }}</td>
-                <td class="p-3 text-right font-medium">€{{ invoice.total }}</td>
-                <td class="p-3 text-center">
-                    {% if invoice.status == 'draft' %}
-                    <ion-badge color="medium">{% trans "Draft" %}</ion-badge>
-                    {% elif invoice.status == 'issued' %}
-                    <ion-badge color="primary">{% trans "Issued" %}</ion-badge>
-                    {% elif invoice.status == 'paid' %}
-                    <ion-badge color="success">{% trans "Paid" %}</ion-badge>
-                    {% elif invoice.status == 'cancelled' %}
-                    <ion-badge color="danger">{% trans "Cancelled" %}</ion-badge>
-                    {% endif %}
+                <td class="datatable-td" data-label="{% trans 'Customer' %}">
+                    <div>
+                        <span class="font-medium">{{ invoice.customer_name }}</span>
+                        {% if invoice.customer_tax_id %}
+                        <div class="text-xs text-base-content/60">{{ invoice.customer_tax_id }}</div>
+                        {% endif %}
+                    </div>
                 </td>
-                <td class="p-3 text-center">
-                    <ion-button size="small" fill="clear"
-                        hx-get="{% url 'invoicing:invoice_detail' invoice.id %}"
-                        hx-target="#dashboard-content"
-                        hx-push-url="true">
-                        <ion-icon slot="icon-only" name="eye-outline"></ion-icon>
-                    </ion-button>
+                <td class="datatable-td" data-label="{% trans 'Date' %}">
+                    <span class="text-base-content/60">{{ invoice.issue_date|date:"M d, Y" }}</span>
                 </td>
-            </tr>
-            {% empty %}
-            <tr>
-                <td colspan="6" class="text-center py-12">
-                    <ion-icon name="document-text-outline" style="font-size: 64px; color: var(--ion-color-medium);"></ion-icon>
-                    <p class="mt-4" style="color: var(--ion-color-medium);">{% trans "No invoices found" %}</p>
-                    <ion-button class="mt-4"
-                        hx-get="{% url 'invoicing:invoice_create' %}"
-                        hx-target="#dashboard-content"
-                        hx-push-url="true">
-                        <ion-icon slot="start" name="add-outline"></ion-icon>
-                        {% trans "Create First Invoice" %}
-                    </ion-button>
+                <td class="datatable-td" data-label="{% trans 'Due Date' %}">
+                    <span class="text-base-content/60">{{ invoice.due_date|date:"M d, Y"|default:"-" }}</span>
+                </td>
+                <td class="datatable-td" data-label="{% trans 'Total' %}">
+                    <span class="font-medium">{{ invoice.total|floatformat:2 }}</span>
+                </td>
+                <td class="datatable-td datatable-td-center" data-label="{% trans 'Status' %}">
+                    <span class="badge badge-sm {% if invoice.status == 'paid' %}color-success{% elif invoice.status == 'issued' %}color-primary{% elif invoice.status == 'cancelled' %}color-error{% endif %}">
+                        {{ invoice.get_status_display }}
+                    </span>
+                </td>
+                <td class="datatable-td datatable-td-actions" onclick="event.stopPropagation();">
+                    <div class="datatable-row-actions">
+                        <a class="datatable-row-action"
+                           hx-get="{% url 'invoicing:invoice_detail' invoice.id %}"
+                           hx-target="#main-content-area"
+                           hx-push-url="true"
+                           title="{% trans 'View' %}">
+                            {% icon "eye-outline" %}
+                        </a>
+                        <a class="datatable-row-action"
+                           href="{% url 'invoicing:invoice_print' invoice.id %}"
+                           target="_blank"
+                           title="{% trans 'Print' %}">
+                            {% icon "print-outline" %}
+                        </a>
+                        {% if invoice.status == 'draft' %}
+                        <button class="datatable-row-action datatable-row-action-danger"
+                                @click="deleteTarget = { id: '{{ invoice.id }}', name: '{{ invoice.number|default:"Draft"|escapejs }}', url: '{% url 'invoicing:invoice_delete' invoice.id %}' }; deleteConfirm = true"
+                                title="{% trans 'Delete' %}">
+                            {% icon "trash-outline" %}
+                        </button>
+                        {% endif %}
+                    </div>
                 </td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
 </div>
+
+<!-- Footer / Pagination -->
+<div class="datatable-footer">
+    <div class="datatable-per-page">
+        {% trans "Show" %}
+        <select name="per_page"
+                hx-get="{% url 'invoicing:invoices' %}"
+                hx-target="#datatable-body"
+                hx-include="#invoices-datatable"
+                hx-trigger="change">
+            <option value="10" {% if per_page == 10 %}selected{% endif %}>10</option>
+            <option value="25" {% if per_page == 25 %}selected{% endif %}>25</option>
+            <option value="50" {% if per_page == 50 %}selected{% endif %}>50</option>
+            <option value="100" {% if per_page == 100 %}selected{% endif %}>100</option>
+        </select>
+        {% trans "per page" %}
+    </div>
+    <span class="datatable-info">
+        {% if page_obj.paginator.count > 0 %}
+        {% blocktrans with start=page_obj.start_index end=page_obj.end_index total=page_obj.paginator.count %}Showing {{ start }}-{{ end }} of {{ total }} invoices{% endblocktrans %}
+        {% endif %}
+    </span>
+    {% if page_obj.paginator.num_pages > 1 %}
+    <nav class="pagination pagination-sm">
+        <button class="pagination-btn pagination-prev"
+                {% if page_obj.has_previous %}
+                hx-get="{% url 'invoicing:invoices' %}?page={{ page_obj.previous_page_number }}"
+                hx-target="#datatable-body"
+                hx-include="#invoices-datatable"
+                {% else %}disabled{% endif %}>
+            {% icon "chevron-back-outline" %}
+        </button>
+        {% for num in page_obj.paginator.page_range %}
+        <button class="pagination-btn{% if num == page_obj.number %} pagination-active{% endif %}"
+                hx-get="{% url 'invoicing:invoices' %}?page={{ num }}"
+                hx-target="#datatable-body"
+                hx-include="#invoices-datatable">
+            {{ num }}
+        </button>
+        {% endfor %}
+        <button class="pagination-btn pagination-next"
+                {% if page_obj.has_next %}
+                hx-get="{% url 'invoicing:invoices' %}?page={{ page_obj.next_page_number }}"
+                hx-target="#datatable-body"
+                hx-include="#invoices-datatable"
+                {% else %}disabled{% endif %}>
+            {% icon "chevron-forward-outline" %}
+        </button>
+    </nav>
+    {% endif %}
+</div>
+
+{% else %}
+<!-- Empty State -->
+<div class="datatable-empty">
+    <div class="datatable-empty-icon">
+        {% if search_query or status_filter or type_filter %}
+        {% icon "search-outline" %}
+        {% else %}
+        {% icon "document-text-outline" %}
+        {% endif %}
+    </div>
+    <div class="datatable-empty-title">
+        {% if search_query or status_filter or type_filter %}
+        {% trans "No invoices found" %}
+        {% else %}
+        {% trans "No invoices yet" %}
+        {% endif %}
+    </div>
+    <div class="datatable-empty-text">
+        {% if search_query or status_filter or type_filter %}
+        {% trans "Try a different search term or filter" %}
+        {% else %}
+        {% trans "Create your first invoice to get started" %}
+        {% endif %}
+    </div>
+    {% if not search_query and not status_filter and not type_filter %}
+    <button class="btn color-primary mt-4"
+            hx-get="{% url 'invoicing:invoice_create' %}"
+            hx-target="#main-content-area"
+            hx-push-url="true">
+        {% icon "add-outline" %}
+        {% trans "Create First Invoice" %}
+    </button>
+    {% endif %}
+</div>
+{% endif %}

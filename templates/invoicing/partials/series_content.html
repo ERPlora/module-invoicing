@@ -1,134 +1,103 @@
-{% load static %}
-{% load i18n %}
+{% load i18n djicons %}
 
-<!-- Tab bar update via OOB swap (only on HTMX navigation) -->
-<div id="dashboard-tabbar" hx-swap-oob="innerHTML">
-<ion-footer>
-{% include "invoicing/partials/tabbar.html" with current_view='series' %}
-</ion-footer>
-</div>
+<div x-data="{
+    panelOpen: false,
+    editUrl: '',
+    deleteConfirm: false,
+    deleteTarget: null,
+    openPanel(url) {
+        this.editUrl = url;
+        htmx.ajax('GET', url, { target: '#series-panel-content', swap: 'innerHTML' });
+        this.panelOpen = true;
+    },
+    closePanel() {
+        this.panelOpen = false;
+    },
+    confirmDelete() {
+        if (this.deleteTarget) {
+            htmx.ajax('POST', this.deleteTarget.url, {
+                target: '#datatable-body',
+                swap: 'innerHTML',
+                headers: { 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || '{{ csrf_token }}' }
+            });
+        }
+        this.deleteConfirm = false;
+        this.deleteTarget = null;
+    }
+}">
 
-{% csrf_token %}
-<div x-data="seriesApp()" class="ion-padding">
-    <!-- Page Header -->
-    <div class="flex justify-between items-center mb-6">
-        <div>
-            <h1 class="text-2xl font-bold" style="color: var(--ion-text-color);">{% trans "Invoice Series" %}</h1>
-            <p class="text-sm mt-1" style="color: var(--ion-color-medium);">{% trans "Manage invoice numbering series" %}</p>
+    <div class="datatable glass mt-5" id="series-datatable">
+
+        <!-- Toolbar -->
+        <div class="datatable-toolbar">
+            <div class="datatable-toolbar-start">
+                <label class="input input-sm datatable-search">
+                    {% icon "search-outline" %}
+                    <input type="search"
+                           name="q"
+                           placeholder="{% trans 'Search series...' %}"
+                           value="{{ search_query|default:'' }}"
+                           autocomplete="off"
+                           hx-get="{% url 'invoicing:series' %}"
+                           hx-target="#datatable-body"
+                           hx-include="#series-datatable"
+                           hx-trigger="input changed delay:300ms, search">
+                </label>
+            </div>
+            <div class="datatable-toolbar-end">
+                <!-- Add Series -->
+                <button class="btn btn-sm btn-circle color-primary"
+                        @click="openPanel('{% url 'invoicing:series_add' %}')"
+                        title="{% trans 'Add Series' %}">
+                    {% icon "add-outline" %}
+                </button>
+            </div>
         </div>
-        <ion-button
-            color="success"
-            hx-get="{% url 'invoicing:series_create' %}"
-            hx-target="#dashboard-content"
-            hx-push-url="true">
-            <ion-icon slot="start" name="add-outline"></ion-icon>
-            {% trans "New Series" %}
-        </ion-button>
-    </div>
 
-    <!-- Series List -->
-    <ion-card class="m-0">
-        <ion-card-content class="p-0">
-            <ion-list lines="full">
-                {% for series in series_list %}
-                <ion-item>
-                    <div slot="start" class="w-12 h-12 flex items-center justify-center rounded-lg font-bold text-lg" style="background: var(--ion-color-primary-tint); color: var(--ion-color-primary);">
-                        {{ series.prefix }}
-                    </div>
-                    <ion-label>
-                        <h2>{{ series.name }}</h2>
-                        <p>{{ series.description|default:_("No description") }}</p>
-                        <p class="text-xs">
-                            {% trans "Next number" %}: {{ series.prefix }}{{ series.current_number|stringformat:"06d" }}
-                        </p>
-                    </ion-label>
-                    <div slot="end" class="flex items-center gap-2">
-                        {% if series.is_default %}
-                        <ion-badge color="primary">{% trans "Default" %}</ion-badge>
-                        {% endif %}
-                        {% if not series.is_active %}
-                        <ion-badge color="medium">{% trans "Inactive" %}</ion-badge>
-                        {% endif %}
-                        <ion-button fill="clear" size="small"
-                            hx-get="{% url 'invoicing:series_edit' series.id %}"
-                            hx-target="#dashboard-content"
-                            hx-push-url="true">
-                            <ion-icon slot="icon-only" name="create-outline"></ion-icon>
-                        </ion-button>
-                        <ion-button fill="clear" color="danger" size="small"
-                            @click="deleteSeries({{ series.id }}, '{{ series.prefix }}')">
-                            <ion-icon slot="icon-only" name="trash-outline"></ion-icon>
-                        </ion-button>
-                    </div>
-                </ion-item>
-                {% empty %}
-                <ion-item>
-                    <ion-label class="text-center py-8">
-                        <ion-icon name="list-outline" style="font-size: 48px; color: var(--ion-color-medium);"></ion-icon>
-                        <p class="mt-2" style="color: var(--ion-color-medium);">{% trans "No series created" %}</p>
-                    </ion-label>
-                </ion-item>
-                {% endfor %}
-            </ion-list>
-        </ion-card-content>
-    </ion-card>
+        {% csrf_token %}
 
-    <!-- Info -->
-    <div class="mt-6 p-4 rounded-lg" style="background: var(--ion-color-step-50);">
-        <div class="flex items-start gap-2">
-            <ion-icon name="information-circle-outline" style="font-size: 20px; color: var(--ion-color-primary); margin-top: 2px;"></ion-icon>
-            <p class="text-sm" style="color: var(--ion-color-medium);">
-                {% trans "Invoice series allow you to have different numbering sequences for different types of invoices. Each series has its own prefix (e.g., F for invoices, R for receipts) and auto-incrementing number." %}
-            </p>
+        <!-- Hidden state inputs -->
+        <input type="hidden" name="sort" value="{{ sort_field|default:'prefix' }}">
+        <input type="hidden" name="dir" value="{{ sort_dir|default:'asc' }}">
+
+        <!-- Datatable Body (HTMX swap target) -->
+        <div id="datatable-body">
+            {% include "invoicing/partials/series_table.html" %}
         </div>
     </div>
+
+    <!-- Side Sheet -->
+    <div class="sheet-backdrop" :class="{ 'is-open': panelOpen }" @click.self="closePanel()">
+        <div class="side-sheet side-sheet-right" id="series-panel-content">
+            <!-- Content loaded via HTMX -->
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div class="modal-backdrop" :data-state="deleteConfirm ? 'open' : 'closed'" @click.self="deleteConfirm = false; deleteTarget = null">
+        <div class="modal modal-sm">
+            <div class="modal-header">
+                <h3 class="modal-title">{% trans "Delete Series" %}</h3>
+                <button class="modal-close" @click="deleteConfirm = false; deleteTarget = null">
+                    {% icon "close-outline" %}
+                </button>
+            </div>
+            <div class="modal-body">
+                <p class="text-sm text-base-content/70">
+                    {% trans "Are you sure you want to delete" %} <strong x-text="deleteTarget?.name"></strong>?
+                    {% trans "This action cannot be undone." %}
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-ghost btn-sm" @click="deleteConfirm = false; deleteTarget = null">
+                    {% trans "Cancel" %}
+                </button>
+                <button class="btn btn-sm color-error" @click="confirmDelete()">
+                    {% icon "trash-outline" %}
+                    {% trans "Delete" %}
+                </button>
+            </div>
+        </div>
+    </div>
+
 </div>
-
-<script>
-// Register globally for HTMX compatibility
-window.seriesApp = function() {
-    return {
-        async deleteSeries(id, prefix) {
-            if (!confirm(`{% trans "Delete series" %} ${prefix}? {% trans "This action cannot be undone." %}`)) return;
-
-            try {
-                const response = await fetch(`/modules/invoicing/series/${id}/delete/`, {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-                    }
-                });
-                const data = await response.json();
-                if (data.success) {
-                    this.showToast(data.message, 'success');
-                    setTimeout(() => htmx.ajax('GET', '{% url "invoicing:series" %}', {target: '#dashboard-content'}), 1000);
-                } else {
-                    this.showToast(data.error, 'danger');
-                }
-            } catch (error) {
-                this.showToast('{% trans "Error deleting series" %}', 'danger');
-            }
-        },
-
-        async showToast(message, color = 'primary') {
-            const toast = document.createElement('ion-toast');
-            toast.message = message;
-            toast.duration = 2000;
-            toast.color = color;
-            toast.position = 'top';
-            document.body.appendChild(toast);
-            await toast.present();
-        }
-    }
-};
-
-// Re-initialize Alpine after HTMX swap
-document.addEventListener('htmx:afterSwap', function(event) {
-    if (event.detail.target.id === 'dashboard-content') {
-        const alpineEl = event.detail.target.querySelector('[x-data]');
-        if (alpineEl && !alpineEl._x_dataStack) {
-            Alpine.initTree(alpineEl);
-        }
-    }
-});
-</script>

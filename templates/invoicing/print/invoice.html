@@ -4,18 +4,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ invoice.number|default:_("Draft") }}</title>
+    <title>{{ invoice.number|default:"Draft" }}</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
             font-family: 'Helvetica Neue', Arial, sans-serif;
             font-size: 12px;
-            line-height: 1.4;
+            line-height: 1.5;
             color: #333;
             padding: 20px;
             max-width: 800px;
@@ -30,37 +26,13 @@
             border-bottom: 2px solid #333;
         }
 
-        .company-info h1 {
-            font-size: 24px;
-            margin-bottom: 8px;
-            color: #222;
-        }
+        .company-info h1 { font-size: 22px; margin-bottom: 8px; color: #111; }
+        .company-info p { color: #666; margin: 2px 0; }
 
-        .company-info p {
-            color: #666;
-            margin: 2px 0;
-        }
-
-        .invoice-info {
-            text-align: right;
-        }
-
-        .invoice-info h2 {
-            font-size: 28px;
-            color: #333;
-            margin-bottom: 10px;
-        }
-
-        .invoice-info .number {
-            font-size: 18px;
-            font-weight: bold;
-            color: #000;
-        }
-
-        .invoice-info .date {
-            color: #666;
-            margin-top: 5px;
-        }
+        .invoice-info { text-align: right; }
+        .invoice-info h2 { font-size: 26px; color: #333; margin-bottom: 10px; }
+        .invoice-info .number { font-size: 18px; font-weight: bold; color: #000; }
+        .invoice-info .date { color: #666; margin-top: 5px; }
 
         .invoice-info .status {
             display: inline-block;
@@ -71,7 +43,6 @@
             text-transform: uppercase;
             margin-top: 10px;
         }
-
         .status-draft { background: #f0f0f0; color: #666; }
         .status-issued { background: #e3f2fd; color: #1976d2; }
         .status-paid { background: #e8f5e9; color: #388e3c; }
@@ -82,11 +53,7 @@
             justify-content: space-between;
             margin-bottom: 30px;
         }
-
-        .party {
-            width: 48%;
-        }
-
+        .party { width: 48%; }
         .party h3 {
             font-size: 11px;
             text-transform: uppercase;
@@ -95,70 +62,32 @@
             padding-bottom: 5px;
             border-bottom: 1px solid #ddd;
         }
+        .party .name { font-size: 14px; font-weight: bold; margin-bottom: 5px; }
+        .party p { color: #555; margin: 2px 0; }
 
-        .party .name {
-            font-size: 14px;
-            font-weight: bold;
-            margin-bottom: 5px;
-        }
-
-        .party p {
-            color: #555;
-            margin: 2px 0;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 20px;
-        }
-
+        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
         th {
             background: #f5f5f5;
-            padding: 12px;
+            padding: 10px 12px;
             text-align: left;
             font-size: 11px;
             text-transform: uppercase;
             color: #666;
             border-bottom: 2px solid #ddd;
         }
+        th:nth-child(n+2) { text-align: right; }
+        td { padding: 10px 12px; border-bottom: 1px solid #eee; vertical-align: top; }
+        td:nth-child(n+2) { text-align: right; }
+        .description { font-weight: 500; }
+        .sku { font-size: 10px; color: #888; }
 
-        th:nth-child(2), th:nth-child(3), th:nth-child(4), th:nth-child(5) {
-            text-align: right;
-        }
-
-        td {
-            padding: 12px;
-            border-bottom: 1px solid #eee;
-            vertical-align: top;
-        }
-
-        td:nth-child(2), td:nth-child(3), td:nth-child(4), td:nth-child(5) {
-            text-align: right;
-        }
-
-        .description {
-            font-weight: 500;
-        }
-
-        .sku {
-            font-size: 10px;
-            color: #888;
-        }
-
-        .summary {
-            float: right;
-            width: 300px;
-            margin-top: 20px;
-        }
-
+        .summary { float: right; width: 300px; margin-top: 20px; }
         .summary-row {
             display: flex;
             justify-content: space-between;
             padding: 8px 0;
             border-bottom: 1px solid #eee;
         }
-
         .summary-row.total {
             font-size: 16px;
             font-weight: bold;
@@ -167,6 +96,15 @@
             margin-top: 10px;
             padding: 12px 0;
         }
+
+        .notes {
+            clear: both;
+            margin-top: 40px;
+            padding: 15px;
+            background: #f9f9f9;
+            border-radius: 4px;
+        }
+        .notes h4 { font-size: 11px; text-transform: uppercase; color: #666; margin-bottom: 8px; }
 
         .footer {
             clear: both;
@@ -178,31 +116,9 @@
             font-size: 10px;
         }
 
-        .notes {
-            clear: both;
-            margin-top: 40px;
-            padding: 15px;
-            background: #f9f9f9;
-            border-radius: 4px;
-        }
-
-        .notes h4 {
-            font-size: 11px;
-            text-transform: uppercase;
-            color: #666;
-            margin-bottom: 8px;
-        }
-
         @media print {
-            body {
-                padding: 0;
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
-            }
-
-            .no-print {
-                display: none !important;
-            }
+            body { padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .no-print { display: none !important; }
         }
 
         .print-button {
@@ -213,14 +129,11 @@
             background: #333;
             color: white;
             border: none;
-            border-radius: 4px;
+            border-radius: 6px;
             cursor: pointer;
             font-size: 14px;
         }
-
-        .print-button:hover {
-            background: #555;
-        }
+        .print-button:hover { background: #555; }
     </style>
 </head>
 <body>
@@ -228,15 +141,21 @@
 
     <div class="header">
         <div class="company-info">
-            <h1>{{ config.company_name|default:_("Your Company") }}</h1>
-            <p>{{ config.company_tax_id }}</p>
-            <p>{{ config.company_address }}</p>
-            <p>{{ config.company_phone }}</p>
-            <p>{{ config.company_email }}</p>
+            <h1>{{ settings.company_name|default:"Your Company" }}</h1>
+            {% if settings.company_tax_id %}<p>{{ settings.company_tax_id }}</p>{% endif %}
+            {% if settings.company_address %}<p>{{ settings.company_address }}</p>{% endif %}
+            {% if settings.company_phone %}<p>{{ settings.company_phone }}</p>{% endif %}
+            {% if settings.company_email %}<p>{{ settings.company_email }}</p>{% endif %}
         </div>
         <div class="invoice-info">
-            <h2>{% trans "INVOICE" %}</h2>
-            <div class="number">{{ invoice.number|default:_("DRAFT") }}</div>
+            {% if invoice.invoice_type == 'rectifying' %}
+                <h2>{% trans "RECTIFYING INVOICE" %}</h2>
+            {% elif invoice.invoice_type == 'simplified' %}
+                <h2>{% trans "SIMPLIFIED INVOICE" %}</h2>
+            {% else %}
+                <h2>{% trans "INVOICE" %}</h2>
+            {% endif %}
+            <div class="number">{{ invoice.number|default:"DRAFT" }}</div>
             <div class="date">{{ invoice.issue_date|date:"j F Y" }}</div>
             <div class="status status-{{ invoice.status }}">{{ invoice.get_status_display }}</div>
         </div>
@@ -246,27 +165,23 @@
         <div class="party">
             <h3>{% trans "Bill To" %}</h3>
             <div class="name">{{ invoice.customer_name }}</div>
-            {% if invoice.customer_tax_id %}
-            <p>{% trans "Tax ID" %}: {{ invoice.customer_tax_id }}</p>
-            {% endif %}
-            {% if invoice.customer_address %}
-            <p>{{ invoice.customer_address }}</p>
-            {% endif %}
-            {% if invoice.customer_email %}
-            <p>{{ invoice.customer_email }}</p>
-            {% endif %}
-            {% if invoice.customer_phone %}
-            <p>{{ invoice.customer_phone }}</p>
-            {% endif %}
+            {% if invoice.customer_tax_id %}<p>{% trans "Tax ID" %}: {{ invoice.customer_tax_id }}</p>{% endif %}
+            {% if invoice.customer_address %}<p>{{ invoice.customer_address }}</p>{% endif %}
+            {% if invoice.customer_email %}<p>{{ invoice.customer_email }}</p>{% endif %}
+            {% if invoice.customer_phone %}<p>{{ invoice.customer_phone }}</p>{% endif %}
         </div>
         <div class="party">
             <h3>{% trans "Invoice Details" %}</h3>
             <p><strong>{% trans "Series" %}:</strong> {{ invoice.series.prefix }} - {{ invoice.series.name }}</p>
             <p><strong>{% trans "Issue Date" %}:</strong> {{ invoice.issue_date|date:"Y-m-d" }}</p>
-            {% if invoice.due_date %}
-            <p><strong>{% trans "Due Date" %}:</strong> {{ invoice.due_date|date:"Y-m-d" }}</p>
-            {% endif %}
+            {% if invoice.due_date %}<p><strong>{% trans "Due Date" %}:</strong> {{ invoice.due_date|date:"Y-m-d" }}</p>{% endif %}
             <p><strong>{% trans "Type" %}:</strong> {{ invoice.get_invoice_type_display }}</p>
+            {% if invoice.rectified_invoice %}
+            <p><strong>{% trans "Rectifies" %}:</strong> {{ invoice.rectified_invoice.number }}</p>
+            {% endif %}
+            {% if invoice.employee %}
+            <p><strong>{% trans "Issued by" %}:</strong> {{ invoice.employee }}</p>
+            {% endif %}
         </div>
     </div>
 
@@ -281,18 +196,16 @@
             </tr>
         </thead>
         <tbody>
-            {% for line in invoice.lines.all %}
+            {% for line in lines %}
             <tr>
                 <td>
                     <div class="description">{{ line.description }}</div>
-                    {% if line.product_sku %}
-                    <div class="sku">{{ line.product_sku }}</div>
-                    {% endif %}
+                    {% if line.product_sku %}<div class="sku">{{ line.product_sku }}</div>{% endif %}
                 </td>
                 <td>{{ line.quantity }}</td>
-                <td>€{{ line.unit_price }}</td>
+                <td>{{ line.unit_price|floatformat:2 }}</td>
                 <td>{% if line.discount_percent %}{{ line.discount_percent }}%{% else %}-{% endif %}</td>
-                <td>€{{ line.line_total }}</td>
+                <td>{{ line.total|floatformat:2 }}</td>
             </tr>
             {% endfor %}
         </tbody>
@@ -301,15 +214,15 @@
     <div class="summary">
         <div class="summary-row">
             <span>{% trans "Subtotal" %}</span>
-            <span>€{{ invoice.subtotal }}</span>
+            <span>{{ invoice.subtotal|floatformat:2 }}</span>
         </div>
         <div class="summary-row">
             <span>{% trans "Tax" %} ({{ invoice.tax_rate }}%)</span>
-            <span>€{{ invoice.tax_amount }}</span>
+            <span>{{ invoice.tax_amount|floatformat:2 }}</span>
         </div>
         <div class="summary-row total">
             <span>{% trans "Total" %}</span>
-            <span>€{{ invoice.total }}</span>
+            <span>{{ invoice.total|floatformat:2 }}</span>
         </div>
     </div>
 
@@ -320,9 +233,9 @@
     </div>
     {% endif %}
 
-    {% if config.invoice_footer %}
+    {% if settings.invoice_footer %}
     <div class="footer">
-        {{ config.invoice_footer }}
+        {{ settings.invoice_footer }}
     </div>
     {% endif %}
 </body>

@@ -1,0 +1,122 @@
+{% load i18n djicons %}
+
+{% if series_list %}
+
+<div class="datatable-body">
+    <table class="datatable-table">
+        <thead class="datatable-thead">
+            <tr>
+                <th class="datatable-th datatable-th-sortable{% if sort_field == 'prefix' %} datatable-th-sorted{% if sort_dir == 'desc' %} datatable-th-sorted-desc{% endif %}{% endif %}"
+                    hx-get="{% url 'invoicing:series' %}?sort=prefix&dir={% if sort_field == 'prefix' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}"
+                    hx-target="#datatable-body"
+                    hx-include="#series-datatable"
+                    style="cursor: pointer;">
+                    {% trans "Prefix" %}
+                    <span class="datatable-sort-icon">{% icon "chevron-up-outline" %}</span>
+                </th>
+                <th class="datatable-th datatable-th-sortable{% if sort_field == 'name' %} datatable-th-sorted{% if sort_dir == 'desc' %} datatable-th-sorted-desc{% endif %}{% endif %}"
+                    hx-get="{% url 'invoicing:series' %}?sort=name&dir={% if sort_field == 'name' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}"
+                    hx-target="#datatable-body"
+                    hx-include="#series-datatable"
+                    style="cursor: pointer;">
+                    {% trans "Name" %}
+                    <span class="datatable-sort-icon">{% icon "chevron-up-outline" %}</span>
+                </th>
+                <th class="datatable-th">{% trans "Next Number" %}</th>
+                <th class="datatable-th">{% trans "Invoices" %}</th>
+                <th class="datatable-th datatable-th-center">{% trans "Active" %}</th>
+                <th class="datatable-th datatable-th-actions">{% trans "Actions" %}</th>
+            </tr>
+        </thead>
+        <tbody class="datatable-tbody">
+            {% for series in series_list %}
+            <tr class="datatable-tr">
+                <td class="datatable-td" data-label="{% trans 'Prefix' %}">
+                    <div class="flex items-center gap-3 cursor-pointer"
+                         @click="openPanel('{% url 'invoicing:series_edit' series.id %}')">
+                        <div class="w-10 h-10 flex items-center justify-center rounded-lg font-bold text-sm bg-primary/10 text-primary">
+                            {{ series.prefix }}
+                        </div>
+                        {% if series.is_default %}
+                        <span class="badge badge-sm color-primary">{% trans "Default" %}</span>
+                        {% endif %}
+                    </div>
+                </td>
+                <td class="datatable-td" data-label="{% trans 'Name' %}">
+                    <span class="font-medium cursor-pointer"
+                          @click="openPanel('{% url 'invoicing:series_edit' series.id %}')">
+                        {{ series.name }}
+                    </span>
+                    {% if series.description %}
+                    <div class="text-xs text-base-content/60">{{ series.description|truncatewords:10 }}</div>
+                    {% endif %}
+                </td>
+                <td class="datatable-td" data-label="{% trans 'Next Number' %}">
+                    <span class="font-mono text-base-content/60">{{ series.prefix }}{{ series.next_number|stringformat:"06d" }}</span>
+                </td>
+                <td class="datatable-td" data-label="{% trans 'Invoices' %}">
+                    <span class="badge badge-sm badge-ghost">{{ series.invoice_count }}</span>
+                </td>
+                <td class="datatable-td datatable-td-center" data-label="{% trans 'Active' %}" onclick="event.stopPropagation();">
+                    <label class="toggle toggle-sm color-success">
+                        <input type="checkbox"
+                               {% if series.is_active %}checked{% endif %}
+                               hx-post="{% url 'invoicing:series_toggle' series.id %}"
+                               hx-target="#datatable-body"
+                               hx-include="#series-datatable">
+                        <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                    </label>
+                </td>
+                <td class="datatable-td datatable-td-actions">
+                    <div class="datatable-row-actions">
+                        <button class="datatable-row-action"
+                                @click="openPanel('{% url 'invoicing:series_edit' series.id %}')"
+                                title="{% trans 'Edit' %}">
+                            {% icon "create-outline" %}
+                        </button>
+                        <button class="datatable-row-action datatable-row-action-danger"
+                                @click="deleteTarget = { id: '{{ series.id }}', name: '{{ series.prefix|escapejs }} - {{ series.name|escapejs }}', url: '{% url 'invoicing:series_delete' series.id %}' }; deleteConfirm = true"
+                                title="{% trans 'Delete' %}">
+                            {% icon "trash-outline" %}
+                        </button>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% else %}
+<!-- Empty State -->
+<div class="datatable-empty">
+    <div class="datatable-empty-icon">
+        {% if search_query %}
+        {% icon "search-outline" %}
+        {% else %}
+        {% icon "layers-outline" %}
+        {% endif %}
+    </div>
+    <div class="datatable-empty-title">
+        {% if search_query %}
+        {% trans "No series found" %}
+        {% else %}
+        {% trans "No series yet" %}
+        {% endif %}
+    </div>
+    <div class="datatable-empty-text">
+        {% if search_query %}
+        {% trans "Try a different search term" %}
+        {% else %}
+        {% trans "Create your first invoice series to get started" %}
+        {% endif %}
+    </div>
+    {% if not search_query %}
+    <button class="btn color-primary mt-4"
+            @click="openPanel('{% url 'invoicing:series_add' %}')">
+        {% icon "add-outline" %}
+        {% trans "Add First Series" %}
+    </button>
+    {% endif %}
+</div>
+{% endif %}

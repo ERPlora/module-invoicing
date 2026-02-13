@@ -1,225 +1,220 @@
-{% load static %}
-{% load i18n %}
+{% load i18n djicons %}
 
-<!-- Tab bar update via OOB swap (only on HTMX navigation) -->
-<div id="dashboard-tabbar" hx-swap-oob="innerHTML">
-<ion-footer>
-{% include "invoicing/partials/tabbar.html" with current_view='settings' %}
-</ion-footer>
-</div>
-
-{% csrf_token %}
-<div x-data="settingsApp()" class="ion-padding">
-    <!-- Page Header -->
-    <div class="mb-6">
-        <h1 class="text-2xl font-bold" style="color: var(--ion-text-color);">{% trans "Invoicing Settings" %}</h1>
-        <p class="text-sm mt-1" style="color: var(--ion-color-medium);">{% trans "Configure invoicing module behavior and company data" %}</p>
-    </div>
-
+<div class="p-4">
     <!-- Company Information -->
-    <ion-card class="m-0 mb-4">
-        <ion-card-header>
-            <ion-card-title>{% trans "Company Information" %}</ion-card-title>
-            <ion-card-subtitle>{% trans "This information will appear on your invoices" %}</ion-card-subtitle>
-        </ion-card-header>
-        <ion-card-content>
-            <form id="settings-form" method="POST">
-                {% csrf_token %}
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <ion-item>
-                        <ion-input
-                            name="company_name"
-                            label="{% trans 'Company Name' %}"
-                            label-placement="stacked"
-                            value="{{ config.company_name }}"
-                            placeholder="{% trans 'Your Company Name' %}">
-                        </ion-input>
-                    </ion-item>
-                    <ion-item>
-                        <ion-input
-                            name="company_tax_id"
-                            label="{% trans 'Tax ID (NIF/CIF)' %}"
-                            label-placement="stacked"
-                            value="{{ config.company_tax_id }}"
-                            placeholder="B12345678">
-                        </ion-input>
-                    </ion-item>
-                    <ion-item class="md:col-span-2">
-                        <ion-textarea
-                            name="company_address"
-                            label="{% trans 'Address' %}"
-                            label-placement="stacked"
-                            rows="2"
-                            placeholder="{% trans 'Street, City, Postal Code' %}">{{ config.company_address }}</ion-textarea>
-                    </ion-item>
-                    <ion-item>
-                        <ion-input
-                            name="company_phone"
-                            label="{% trans 'Phone' %}"
-                            label-placement="stacked"
-                            type="tel"
-                            value="{{ config.company_phone }}"
-                            placeholder="+34 600 000 000">
-                        </ion-input>
-                    </ion-item>
-                    <ion-item>
-                        <ion-input
-                            name="company_email"
-                            label="{% trans 'Email' %}"
-                            label-placement="stacked"
-                            type="email"
-                            value="{{ config.company_email }}"
-                            placeholder="info@company.com">
-                        </ion-input>
-                    </ion-item>
+    <div class="card mb-4">
+        <div class="card-header">
+            <h3 class="card-title">{% icon "business-outline" css_class="text-primary" %} {% trans "Company Information" %}</h3>
+            <p class="text-sm text-base-content/60">{% trans "This information will appear on your invoices" %}</p>
+        </div>
+        <div class="list">
+            <div class="list-item">
+                <div class="list-item-content">
+                    <div class="list-item-label">{% trans "Company Name" %}</div>
+                    <div class="list-item-note">{% trans "Legal business name" %}</div>
                 </div>
-            </form>
-        </ion-card-content>
-    </ion-card>
-
-    <!-- Invoice Settings -->
-    <ion-card class="m-0 mb-4">
-        <ion-card-header>
-            <ion-card-title>{% trans "Invoice Settings" %}</ion-card-title>
-        </ion-card-header>
-        <ion-card-content>
-            <div class="space-y-4">
-                <!-- Default Series -->
-                <div class="flex items-center justify-between p-4 rounded-lg" style="background: var(--ion-color-light);">
-                    <div>
-                        <h3 class="font-medium">{% trans "Default Series" %}</h3>
-                        <p class="text-sm text-medium">{% trans "Series used for new invoices" %}</p>
-                    </div>
-                    <ion-select
-                        name="default_series"
-                        interface="popover"
-                        value="{{ config.default_series }}"
-                        form="settings-form">
-                        {% for series in series_list %}
-                        <ion-select-option value="{{ series.prefix }}">{{ series.prefix }} - {{ series.name }}</ion-select-option>
-                        {% empty %}
-                        <ion-select-option value="F">F - {% trans "Default" %}</ion-select-option>
-                        {% endfor %}
-                    </ion-select>
-                </div>
-
-                <!-- Auto Generate Invoice -->
-                <div class="flex items-center justify-between p-4 rounded-lg" style="background: var(--ion-color-light);">
-                    <div>
-                        <h3 class="font-medium">{% trans "Auto Generate Invoice" %}</h3>
-                        <p class="text-sm text-medium">{% trans "Automatically create invoice after sale" %}</p>
-                    </div>
-                    <ion-toggle
-                        name="auto_generate_invoice"
-                        form="settings-form"
-                        {% if config.auto_generate_invoice %}checked{% endif %}>
-                    </ion-toggle>
-                </div>
-
-                <!-- Require Customer -->
-                <div class="flex items-center justify-between p-4 rounded-lg" style="background: var(--ion-color-light);">
-                    <div>
-                        <h3 class="font-medium">{% trans "Require Customer" %}</h3>
-                        <p class="text-sm text-medium">{% trans "Customer is mandatory for invoices" %}</p>
-                    </div>
-                    <ion-toggle
-                        name="require_customer"
-                        form="settings-form"
-                        {% if config.require_customer %}checked{% endif %}>
-                    </ion-toggle>
+                <div class="list-item-end">
+                    <input type="text" name="company_name"
+                           value="{{ settings.company_name }}"
+                           class="input input-sm"
+                           style="width: 220px;"
+                           placeholder="{% trans 'Your Company Name' %}"
+                           hx-post="{% url 'invoicing:settings_input' %}"
+                           hx-vals='js:{field: "company_name", value: event.target.value}'
+                           hx-trigger="change"
+                           hx-swap="none">
                 </div>
             </div>
-        </ion-card-content>
-    </ion-card>
-
-    <!-- Invoice Footer -->
-    <ion-card class="m-0 mb-4">
-        <ion-card-header>
-            <ion-card-title>{% trans "Invoice Footer" %}</ion-card-title>
-            <ion-card-subtitle>{% trans "Text that appears at the bottom of invoices" %}</ion-card-subtitle>
-        </ion-card-header>
-        <ion-card-content>
-            <ion-textarea
-                name="invoice_footer"
-                form="settings-form"
-                rows="3"
-                placeholder="{% trans 'Payment terms, legal information, thank you message...' %}">{{ config.invoice_footer }}</ion-textarea>
-        </ion-card-content>
-    </ion-card>
-
-    <!-- Save Button -->
-    <div class="flex justify-end gap-4">
-        <ion-button color="medium" fill="outline" @click="resetForm()">
-            <ion-icon slot="start" name="refresh-outline"></ion-icon>
-            {% trans "Reset" %}
-        </ion-button>
-        <ion-button @click="saveSettings()" color="success">
-            <ion-icon slot="start" name="save-outline"></ion-icon>
-            {% trans "Save Settings" %}
-        </ion-button>
+            <div class="list-item">
+                <div class="list-item-content">
+                    <div class="list-item-label">{% trans "Tax ID (NIF/CIF)" %}</div>
+                    <div class="list-item-note">{% trans "Company tax identification" %}</div>
+                </div>
+                <div class="list-item-end">
+                    <input type="text" name="company_tax_id"
+                           value="{{ settings.company_tax_id }}"
+                           class="input input-sm"
+                           style="width: 180px;"
+                           placeholder="B12345678"
+                           hx-post="{% url 'invoicing:settings_input' %}"
+                           hx-vals='js:{field: "company_tax_id", value: event.target.value}'
+                           hx-trigger="change"
+                           hx-swap="none">
+                </div>
+            </div>
+            <div class="list-item">
+                <div class="list-item-content">
+                    <div class="list-item-label">{% trans "Address" %}</div>
+                    <div class="list-item-note">{% trans "Street, City, Postal Code" %}</div>
+                </div>
+                <div class="list-item-end">
+                    <input type="text" name="company_address"
+                           value="{{ settings.company_address }}"
+                           class="input input-sm"
+                           style="width: 280px;"
+                           placeholder="{% trans 'Street, City, Postal Code' %}"
+                           hx-post="{% url 'invoicing:settings_input' %}"
+                           hx-vals='js:{field: "company_address", value: event.target.value}'
+                           hx-trigger="change"
+                           hx-swap="none">
+                </div>
+            </div>
+            <div class="list-item">
+                <div class="list-item-content">
+                    <div class="list-item-label">{% trans "Phone" %}</div>
+                </div>
+                <div class="list-item-end">
+                    <input type="tel" name="company_phone"
+                           value="{{ settings.company_phone }}"
+                           class="input input-sm"
+                           style="width: 180px;"
+                           placeholder="+34 600 000 000"
+                           hx-post="{% url 'invoicing:settings_input' %}"
+                           hx-vals='js:{field: "company_phone", value: event.target.value}'
+                           hx-trigger="change"
+                           hx-swap="none">
+                </div>
+            </div>
+            <div class="list-item">
+                <div class="list-item-content">
+                    <div class="list-item-label">{% trans "Email" %}</div>
+                </div>
+                <div class="list-item-end">
+                    <input type="email" name="company_email"
+                           value="{{ settings.company_email }}"
+                           class="input input-sm"
+                           style="width: 220px;"
+                           placeholder="info@company.com"
+                           hx-post="{% url 'invoicing:settings_input' %}"
+                           hx-vals='js:{field: "company_email", value: event.target.value}'
+                           hx-trigger="change"
+                           hx-swap="none">
+                </div>
+            </div>
+        </div>
     </div>
 
-    <!-- Info Section -->
-    <div class="mt-6 p-4 rounded-lg" style="background: var(--ion-color-step-50);">
-        <div class="flex items-start gap-2">
-            <ion-icon name="information-circle-outline" style="font-size: 20px; color: var(--ion-color-primary); margin-top: 2px;"></ion-icon>
-            <p class="text-sm" style="color: var(--ion-color-medium);">
-                {% trans "Company information will be displayed on all invoices. Make sure the Tax ID is correct for legal compliance. To manage invoice series, go to the Series tab." %}
-            </p>
+    <!-- Invoice Behavior -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h3 class="card-title">{% icon "settings-outline" css_class="text-warning" %} {% trans "Invoice Behavior" %}</h3>
+        </div>
+        <div class="list">
+            <div class="list-item">
+                <div class="list-item-content">
+                    <div class="list-item-label">{% trans "Default Series Prefix" %}</div>
+                    <div class="list-item-note">{% trans "Default prefix for new invoice series" %}</div>
+                </div>
+                <div class="list-item-end">
+                    <input type="text" name="default_series_prefix"
+                           value="{{ settings.default_series_prefix }}"
+                           class="input input-sm"
+                           style="width: 80px; text-transform: uppercase;"
+                           maxlength="10"
+                           hx-post="{% url 'invoicing:settings_input' %}"
+                           hx-vals='js:{field: "default_series_prefix", value: event.target.value}'
+                           hx-trigger="change"
+                           hx-swap="none">
+                </div>
+            </div>
+            <div class="list-item">
+                <div class="list-item-content">
+                    <div class="list-item-label">{% trans "Auto Generate Invoice" %}</div>
+                    <div class="list-item-note">{% trans "Automatically create invoice after a sale" %}</div>
+                </div>
+                <div class="list-item-end">
+                    <label class="toggle color-success">
+                        <input type="checkbox" name="auto_generate_invoice"
+                               {% if settings.auto_generate_invoice %}checked{% endif %}
+                               hx-post="{% url 'invoicing:settings_toggle' %}"
+                               hx-vals='js:{field: "auto_generate_invoice"}'
+                               hx-swap="none">
+                        <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                    </label>
+                </div>
+            </div>
+            <div class="list-item">
+                <div class="list-item-content">
+                    <div class="list-item-label">{% trans "Require Customer" %}</div>
+                    <div class="list-item-note">{% trans "Customer data is mandatory for invoices" %}</div>
+                </div>
+                <div class="list-item-end">
+                    <label class="toggle color-success">
+                        <input type="checkbox" name="require_customer"
+                               {% if settings.require_customer %}checked{% endif %}
+                               hx-post="{% url 'invoicing:settings_toggle' %}"
+                               hx-vals='js:{field: "require_customer"}'
+                               hx-swap="none">
+                        <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                    </label>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Invoice Footer -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h3 class="card-title">{% icon "document-text-outline" css_class="text-success" %} {% trans "Invoice Footer" %}</h3>
+            <p class="text-sm text-base-content/60">{% trans "Text that appears at the bottom of printed invoices" %}</p>
+        </div>
+        <div class="card-body">
+            <textarea name="invoice_footer"
+                class="textarea"
+                rows="3"
+                placeholder="{% trans 'Payment terms, legal information, thank you message...' %}"
+                hx-post="{% url 'invoicing:settings_input' %}"
+                hx-vals='js:{field: "invoice_footer", value: event.target.value}'
+                hx-trigger="change"
+                hx-swap="none">{{ settings.invoice_footer }}</textarea>
+        </div>
+    </div>
+
+    <!-- Quick Links -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h3 class="card-title">{% icon "link-outline" %} {% trans "Quick Actions" %}</h3>
+        </div>
+        <div class="list">
+            <a hx-get="{% url 'invoicing:series' %}"
+               hx-target="#main-content-area"
+               hx-push-url="true"
+               class="list-item list-item-clickable">
+                <div class="list-item-start">{% icon "layers-outline" css_class="text-primary" %}</div>
+                <div class="list-item-content">
+                    <div class="list-item-label">{% trans "Invoice Series" %}</div>
+                    <div class="list-item-note">{% trans "Manage numbering sequences" %}</div>
+                </div>
+                <div class="list-item-end">
+                    <span class="list-item-chevron"></span>
+                </div>
+            </a>
+        </div>
+    </div>
+
+    <!-- Reset -->
+    <div class="card" style="border-color: var(--color-warning)">
+        <div class="card-header">
+            <h3 class="card-title text-warning">{% trans "Reset Settings" %}</h3>
+        </div>
+        <div class="card-body">
+            <p class="text-base-content/60 mb-3">{% trans "Restore all invoicing settings to their default values." %}</p>
+            <button type="button" class="btn btn-outline color-warning"
+                    onclick="resetSettings()">
+                {% icon "refresh-outline" %} {% trans "Reset to Defaults" %}
+            </button>
         </div>
     </div>
 </div>
 
 <script>
-// Register globally for HTMX compatibility
-window.settingsApp = function() {
-    return {
-        async saveSettings() {
-            const form = document.getElementById('settings-form');
-            const formData = new FormData(form);
-
-            try {
-                const response = await fetch('{% url "invoicing:settings" %}', {
-                    method: 'POST',
-                    body: formData
-                });
-
-                const data = await response.json();
-                if (data.success) {
-                    this.showToast(data.message, 'success');
-                } else {
-                    this.showToast(data.error, 'danger');
-                }
-            } catch (error) {
-                this.showToast('{% trans "Error saving settings" %}', 'danger');
-            }
-        },
-
-        resetForm() {
-            if (confirm('{% trans "Reset all settings to their original values?" %}')) {
-                htmx.ajax('GET', '{% url "invoicing:settings" %}', {target: '#dashboard-content'});
-            }
-        },
-
-        async showToast(message, color = 'primary') {
-            const toast = document.createElement('ion-toast');
-            toast.message = message;
-            toast.duration = 2000;
-            toast.color = color;
-            toast.position = 'top';
-            document.body.appendChild(toast);
-            await toast.present();
-        }
-    }
-};
-
-// Re-initialize Alpine after HTMX swap
-document.addEventListener('htmx:afterSwap', function(event) {
-    if (event.detail.target.id === 'dashboard-content') {
-        const alpineEl = event.detail.target.querySelector('[x-data]');
-        if (alpineEl && !alpineEl._x_dataStack) {
-            Alpine.initTree(alpineEl);
-        }
-    }
-});
+function resetSettings() {
+    if (!confirm('{% trans "Reset all invoicing settings to their default values?" %}')) return;
+    fetch('{% url "invoicing:settings_reset" %}', {
+        method: 'POST',
+        headers: {'X-CSRFToken': '{{ csrf_token }}'}
+    }).then(r => {
+        if (r.ok) htmx.ajax('GET', '{% url "invoicing:settings" %}', '#main-content-area');
+    });
+}
 </script>

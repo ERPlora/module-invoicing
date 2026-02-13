@@ -1,165 +1,101 @@
-{% load static %}
-{% load i18n %}
+{% load i18n djicons %}
 
-<!-- Tab bar update via OOB swap (only on HTMX navigation) -->
-<div id="dashboard-tabbar" hx-swap-oob="innerHTML">
-<ion-footer>
-{% include "invoicing/partials/tabbar.html" with current_view='series' %}
-</ion-footer>
+<!-- Header -->
+<div class="side-sheet-header">
+    <h3 class="sheet-title">{% if series %}{% trans "Edit Series" %}{% else %}{% trans "Add Series" %}{% endif %}</h3>
+    <button class="sheet-close" @click="closePanel()">
+        {% icon "close-outline" %}
+    </button>
 </div>
 
-{% csrf_token %}
-<div x-data="seriesFormApp()" class="ion-padding">
-    <!-- Page Header -->
-    <div class="flex justify-between items-center mb-6">
-        <div class="flex items-center gap-4">
-            <ion-button fill="clear"
-                hx-get="{% url 'invoicing:series' %}"
-                hx-target="#dashboard-content"
-                hx-push-url="true">
-                <ion-icon slot="icon-only" name="arrow-back-outline"></ion-icon>
-            </ion-button>
-            <div>
-                <h1 class="text-2xl font-bold" style="color: var(--ion-text-color);">
-                    {% if series %}{% trans "Edit Series" %}{% else %}{% trans "New Series" %}{% endif %}
-                </h1>
-            </div>
+<!-- Body -->
+<div class="side-sheet-content">
+    <form id="series-form"
+          hx-post="{% if series %}{% url 'invoicing:series_edit' series.id %}{% else %}{% url 'invoicing:series_add' %}{% endif %}"
+          hx-target="#datatable-body"
+          hx-swap="innerHTML"
+          @htmx:after-request="closePanel()"
+          class="flex flex-col gap-4 p-6">
+        {% csrf_token %}
+
+        <!-- Prefix -->
+        <div>
+            <label class="text-sm font-medium mb-1 block">{% trans "Prefix" %} *</label>
+            {{ form.prefix }}
+            {% if form.prefix.errors %}
+            <p class="text-sm text-error mt-1">{{ form.prefix.errors.0 }}</p>
+            {% endif %}
         </div>
-        <ion-button @click="saveSeries()" color="success">
-            <ion-icon slot="start" name="save-outline"></ion-icon>
-            {% trans "Save" %}
-        </ion-button>
-    </div>
 
-    <ion-card class="m-0">
-        <ion-card-content>
-            <form id="series-form" method="POST">
-                {% csrf_token %}
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <ion-item>
-                        <ion-input
-                            name="prefix"
-                            label="{% trans 'Prefix' %} *"
-                            label-placement="stacked"
-                            value="{{ series.prefix|default:'' }}"
-                            placeholder="F"
-                            maxlength="5"
-                            {% if series %}readonly{% endif %}
-                            required>
-                        </ion-input>
-                    </ion-item>
-                    <ion-item>
-                        <ion-input
-                            name="name"
-                            label="{% trans 'Name' %} *"
-                            label-placement="stacked"
-                            value="{{ series.name|default:'' }}"
-                            placeholder="{% trans 'Invoices' %}"
-                            required>
-                        </ion-input>
-                    </ion-item>
-                    <ion-item class="md:col-span-2">
-                        <ion-textarea
-                            name="description"
-                            label="{% trans 'Description' %}"
-                            label-placement="stacked"
-                            rows="2"
-                            placeholder="{% trans 'Optional description...' %}">{{ series.description|default:'' }}</ion-textarea>
-                    </ion-item>
-                    <ion-item>
-                        <ion-input
-                            name="number_digits"
-                            type="number"
-                            label="{% trans 'Number Digits' %}"
-                            label-placement="stacked"
-                            value="{{ series.number_digits|default:6 }}"
-                            min="4"
-                            max="10">
-                        </ion-input>
-                    </ion-item>
-                    <ion-item>
-                        <ion-label>{% trans "Preview" %}</ion-label>
-                        <ion-note slot="end" style="font-family: monospace; font-size: 1.1em;">
-                            {{ series.prefix|default:'F' }}{{ series.current_number|default:1|stringformat:"06d" }}
-                        </ion-note>
-                    </ion-item>
-                </div>
+        <!-- Name -->
+        <div>
+            <label class="text-sm font-medium mb-1 block">{% trans "Name" %} *</label>
+            {{ form.name }}
+            {% if form.name.errors %}
+            <p class="text-sm text-error mt-1">{{ form.name.errors.0 }}</p>
+            {% endif %}
+        </div>
 
-                <div class="mt-6 space-y-4">
-                    <div class="flex items-center justify-between p-4 rounded-lg" style="background: var(--ion-color-light);">
-                        <div>
-                            <h3 class="font-medium">{% trans "Active" %}</h3>
-                            <p class="text-sm text-medium">{% trans "Allow creating invoices with this series" %}</p>
-                        </div>
-                        <ion-toggle
-                            name="is_active"
-                            {% if series.is_active or not series %}checked{% endif %}>
-                        </ion-toggle>
-                    </div>
+        <!-- Description -->
+        <div>
+            <label class="text-sm font-medium mb-1 block">{% trans "Description" %}</label>
+            {{ form.description }}
+        </div>
 
-                    <div class="flex items-center justify-between p-4 rounded-lg" style="background: var(--ion-color-light);">
-                        <div>
-                            <h3 class="font-medium">{% trans "Default" %}</h3>
-                            <p class="text-sm text-medium">{% trans "Use as default series for new invoices" %}</p>
-                        </div>
-                        <ion-toggle
-                            name="is_default"
-                            {% if series.is_default %}checked{% endif %}>
-                        </ion-toggle>
-                    </div>
-                </div>
-            </form>
-        </ion-card-content>
-    </ion-card>
+        <!-- Number Digits -->
+        <div>
+            <label class="text-sm font-medium mb-1 block">{% trans "Number Digits" %}</label>
+            {{ form.number_digits }}
+            <span class="text-xs text-base-content/50 mt-1 block">{% trans "Number of digits for padding (e.g., 6 = F000001)" %}</span>
+        </div>
+
+        {% if series %}
+        <!-- Next Number Preview -->
+        <div>
+            <label class="text-sm font-medium mb-1 block">{% trans "Next Number Preview" %}</label>
+            <span class="font-mono text-lg text-base-content/60">
+                {{ series.prefix }}{{ series.next_number|stringformat:"06d" }}
+            </span>
+        </div>
+        {% endif %}
+
+        <!-- Active Toggle -->
+        <div class="flex items-center justify-between p-4 rounded-lg bg-base-200/30">
+            <div>
+                <div class="font-medium text-sm">{% trans "Active" %}</div>
+                <div class="text-xs text-base-content/60">{% trans "Allow creating invoices with this series" %}</div>
+            </div>
+            <label class="toggle color-success">
+                <input type="checkbox" name="is_active"
+                    {% if form.instance.is_active or not series %}checked{% endif %}>
+                <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            </label>
+        </div>
+
+        <!-- Default Toggle -->
+        <div class="flex items-center justify-between p-4 rounded-lg bg-base-200/30">
+            <div>
+                <div class="font-medium text-sm">{% trans "Default" %}</div>
+                <div class="text-xs text-base-content/60">{% trans "Use as default series for new invoices" %}</div>
+            </div>
+            <label class="toggle color-primary">
+                <input type="checkbox" name="is_default"
+                    {% if form.instance.is_default %}checked{% endif %}>
+                <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            </label>
+        </div>
+    </form>
 </div>
 
-<script>
-// Register globally for HTMX compatibility
-window.seriesFormApp = function() {
-    return {
-        async saveSeries() {
-            const form = document.getElementById('series-form');
-            const formData = new FormData(form);
-
-            try {
-                const response = await fetch(window.location.href, {
-                    method: 'POST',
-                    body: formData
-                });
-
-                const data = await response.json();
-                if (data.success) {
-                    this.showToast(data.message, 'success');
-                    setTimeout(() => {
-                        htmx.ajax('GET', '{% url "invoicing:series" %}', {target: '#dashboard-content'});
-                    }, 500);
-                } else {
-                    this.showToast(data.error, 'danger');
-                }
-            } catch (error) {
-                this.showToast('{% trans "Error saving series" %}', 'danger');
-            }
-        },
-
-        async showToast(message, color = 'primary') {
-            const toast = document.createElement('ion-toast');
-            toast.message = message;
-            toast.duration = 2000;
-            toast.color = color;
-            toast.position = 'top';
-            document.body.appendChild(toast);
-            await toast.present();
-        }
-    }
-};
-
-// Re-initialize Alpine after HTMX swap
-document.addEventListener('htmx:afterSwap', function(event) {
-    if (event.detail.target.id === 'dashboard-content') {
-        const alpineEl = event.detail.target.querySelector('[x-data]');
-        if (alpineEl && !alpineEl._x_dataStack) {
-            Alpine.initTree(alpineEl);
-        }
-    }
-});
-</script>
+<!-- Footer -->
+<div class="side-sheet-footer">
+    <div class="flex justify-end gap-2">
+        <button type="button" class="btn btn-ghost btn-sm" @click="closePanel()">
+            {% trans "Cancel" %}
+        </button>
+        <button type="submit" form="series-form" class="btn btn-sm color-primary">
+            {% icon "save-outline" %}
+            {% if series %}{% trans "Save" %}{% else %}{% trans "Add Series" %}{% endif %}
+        </button>
+    </div>
+</div>

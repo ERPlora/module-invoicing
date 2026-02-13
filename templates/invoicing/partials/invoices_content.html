@@ -1,98 +1,145 @@
-{% load static %}
-{% load i18n %}
+{% load i18n djicons %}
 
-<!-- Tab bar update via OOB swap (only on HTMX navigation) -->
-<div id="dashboard-tabbar" hx-swap-oob="innerHTML">
-<ion-footer>
-{% include "invoicing/partials/tabbar.html" with current_view='invoices' %}
-</ion-footer>
-</div>
+<div x-data="{
+    selectedIds: [],
+    selectAll: false,
+    deleteConfirm: false,
+    deleteTarget: null,
+    toggleSelect(id) {
+        const idx = this.selectedIds.indexOf(id);
+        if (idx > -1) this.selectedIds.splice(idx, 1);
+        else this.selectedIds.push(id);
+        this.selectAll = false;
+    },
+    toggleAll(ids) {
+        if (this.selectAll) this.selectedIds = [];
+        else this.selectedIds = [...ids];
+        this.selectAll = !this.selectAll;
+    },
+    clearSelection() { this.selectedIds = []; this.selectAll = false; },
+    confirmDelete() {
+        if (this.deleteTarget) {
+            htmx.ajax('POST', this.deleteTarget.url, {
+                target: '#datatable-body',
+                swap: 'innerHTML',
+                headers: { 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || '{{ csrf_token }}' }
+            });
+        }
+        this.deleteConfirm = false;
+        this.deleteTarget = null;
+    }
+}">
 
-<div class="ion-padding">
-    <!-- Page Header -->
-    <div class="flex justify-between items-center mb-6">
-        <div>
-            <h1 class="text-2xl font-bold" style="color: var(--ion-text-color);">{% trans "Invoices" %}</h1>
-            <p class="text-sm mt-1" style="color: var(--ion-color-medium);">{% trans "Manage your invoices" %}</p>
+    <div class="datatable glass mt-5" id="invoices-datatable">
+
+        <!-- Toolbar -->
+        <div class="datatable-toolbar">
+            <div class="datatable-toolbar-start">
+                <label class="input input-sm datatable-search">
+                    {% icon "search-outline" %}
+                    <input type="search"
+                           name="q"
+                           placeholder="{% trans 'Search by number, name or tax ID...' %}"
+                           value="{{ search_query|default:'' }}"
+                           autocomplete="off"
+                           hx-get="{% url 'invoicing:invoices' %}"
+                           hx-target="#datatable-body"
+                           hx-include="#invoices-datatable"
+                           hx-trigger="input changed delay:300ms, search">
+                </label>
+                <select name="status"
+                        class="select select-sm"
+                        hx-get="{% url 'invoicing:invoices' %}"
+                        hx-target="#datatable-body"
+                        hx-include="#invoices-datatable"
+                        hx-trigger="change">
+                    <option value="">{% trans "All Status" %}</option>
+                    <option value="draft" {% if status_filter == 'draft' %}selected{% endif %}>{% trans "Draft" %}</option>
+                    <option value="issued" {% if status_filter == 'issued' %}selected{% endif %}>{% trans "Issued" %}</option>
+                    <option value="paid" {% if status_filter == 'paid' %}selected{% endif %}>{% trans "Paid" %}</option>
+                    <option value="cancelled" {% if status_filter == 'cancelled' %}selected{% endif %}>{% trans "Cancelled" %}</option>
+                </select>
+                <select name="type"
+                        class="select select-sm"
+                        hx-get="{% url 'invoicing:invoices' %}"
+                        hx-target="#datatable-body"
+                        hx-include="#invoices-datatable"
+                        hx-trigger="change">
+                    <option value="">{% trans "All Types" %}</option>
+                    <option value="invoice" {% if type_filter == 'invoice' %}selected{% endif %}>{% trans "Invoice" %}</option>
+                    <option value="simplified" {% if type_filter == 'simplified' %}selected{% endif %}>{% trans "Simplified" %}</option>
+                    <option value="rectifying" {% if type_filter == 'rectifying' %}selected{% endif %}>{% trans "Rectifying" %}</option>
+                </select>
+            </div>
+            <div class="datatable-toolbar-end">
+                <!-- New Invoice -->
+                <button class="btn btn-sm color-primary"
+                        hx-get="{% url 'invoicing:invoice_create' %}"
+                        hx-target="#main-content-area"
+                        hx-push-url="true">
+                    {% icon "add-outline" %}
+                    {% trans "New Invoice" %}
+                </button>
+
+                <!-- Export -->
+                <details class="dropdown" x-data="{ open: false }" :open="open" @click.outside="open = false">
+                    <summary class="datatable-export-btn" @click.prevent="open = !open" title="{% trans 'Export' %}">
+                        {% icon "download-outline" %}
+                    </summary>
+                    <div class="dropdown-menu dropdown-menu-right">
+                        <a class="dropdown-item" href="#"
+                           @click.prevent="open = false; window.location.href = '{% url 'invoicing:invoices' %}?export=csv&' + new URLSearchParams({q: document.querySelector('[name=q]')?.value || '', status: document.querySelector('[name=status]')?.value || '', type: document.querySelector('[name=type]')?.value || ''}).toString()">
+                            {% icon "document-text-outline" %}
+                            {% trans "Export as CSV" %}
+                        </a>
+                        <a class="dropdown-item" href="#"
+                           @click.prevent="open = false; window.location.href = '{% url 'invoicing:invoices' %}?export=excel&' + new URLSearchParams({q: document.querySelector('[name=q]')?.value || '', status: document.querySelector('[name=status]')?.value || '', type: document.querySelector('[name=type]')?.value || ''}).toString()">
+                            {% icon "document-text-outline" %}
+                            {% trans "Export as Excel" %}
+                        </a>
+                    </div>
+                </details>
+            </div>
         </div>
-        <ion-button
-            color="success"
-            hx-get="{% url 'invoicing:invoice_create' %}"
-            hx-target="#dashboard-content"
-            hx-push-url="true">
-            <ion-icon slot="start" name="add-outline"></ion-icon>
-            {% trans "New Invoice" %}
-        </ion-button>
+
+        {% csrf_token %}
+
+        <!-- Hidden state inputs -->
+        <input type="hidden" name="sort" value="{{ sort_field|default:'date' }}">
+        <input type="hidden" name="dir" value="{{ sort_dir|default:'desc' }}">
+        <input type="hidden" name="per_page" value="{{ per_page|default:'10' }}">
+
+        <!-- Datatable Body (HTMX swap target) -->
+        <div id="datatable-body">
+            {% include "invoicing/partials/invoices_table.html" %}
+        </div>
     </div>
 
-    <!-- Filters -->
-    <ion-card class="m-0 mb-4">
-        <ion-card-content class="p-4">
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div class="relative flex-1">
-                    <ion-icon
-                        name="search-outline"
-                        class="absolute left-3 top-1/2 -translate-y-1/2"
-                        style="color: var(--ion-color-medium); pointer-events: none; z-index: 10;">
-                    </ion-icon>
-                    <input
-                        type="text"
-                        name="search"
-                        value="{{ request.GET.search|default:'' }}"
-                        placeholder="{% trans 'Search invoices...' %}"
-                        class="w-full h-10 pl-10 pr-3 rounded-lg"
-                        style="border: 1px solid var(--ion-border-color); background: var(--ion-background-color); color: var(--ion-text-color);"
-                        hx-get="{% url 'invoicing:invoices' %}"
-                        hx-trigger="keyup changed delay:400ms"
-                        hx-target="#invoices-table-container"
-                        hx-include="[name='status'],[name='date_from'],[name='date_to']">
-                </div>
-                <select
-                    name="status"
-                    class="h-10 px-3 rounded-lg"
-                    style="border: 1px solid var(--ion-border-color); background: var(--ion-background-color); color: var(--ion-text-color);"
-                    hx-get="{% url 'invoicing:invoices' %}"
-                    hx-trigger="change"
-                    hx-target="#invoices-table-container"
-                    hx-include="[name='search'],[name='date_from'],[name='date_to']">
-                    <option value="">{% trans "All Status" %}</option>
-                    <option value="draft" {% if request.GET.status == 'draft' %}selected{% endif %}>{% trans "Draft" %}</option>
-                    <option value="issued" {% if request.GET.status == 'issued' %}selected{% endif %}>{% trans "Issued" %}</option>
-                    <option value="paid" {% if request.GET.status == 'paid' %}selected{% endif %}>{% trans "Paid" %}</option>
-                    <option value="cancelled" {% if request.GET.status == 'cancelled' %}selected{% endif %}>{% trans "Cancelled" %}</option>
-                </select>
-                <input
-                    type="date"
-                    name="date_from"
-                    value="{{ request.GET.date_from|default:'' }}"
-                    placeholder="{% trans 'From' %}"
-                    class="h-10 px-3 rounded-lg"
-                    style="border: 1px solid var(--ion-border-color); background: var(--ion-background-color); color: var(--ion-text-color);"
-                    hx-get="{% url 'invoicing:invoices' %}"
-                    hx-trigger="change"
-                    hx-target="#invoices-table-container"
-                    hx-include="[name='search'],[name='status'],[name='date_to']">
-                <input
-                    type="date"
-                    name="date_to"
-                    value="{{ request.GET.date_to|default:'' }}"
-                    placeholder="{% trans 'To' %}"
-                    class="h-10 px-3 rounded-lg"
-                    style="border: 1px solid var(--ion-border-color); background: var(--ion-background-color); color: var(--ion-text-color);"
-                    hx-get="{% url 'invoicing:invoices' %}"
-                    hx-trigger="change"
-                    hx-target="#invoices-table-container"
-                    hx-include="[name='search'],[name='status'],[name='date_from']">
+    <!-- Delete Confirmation Modal -->
+    <div class="modal-backdrop" :data-state="deleteConfirm ? 'open' : 'closed'" @click.self="deleteConfirm = false; deleteTarget = null">
+        <div class="modal modal-sm">
+            <div class="modal-header">
+                <h3 class="modal-title">{% trans "Delete Invoice" %}</h3>
+                <button class="modal-close" @click="deleteConfirm = false; deleteTarget = null">
+                    {% icon "close-outline" %}
+                </button>
             </div>
-        </ion-card-content>
-    </ion-card>
+            <div class="modal-body">
+                <p class="text-sm text-base-content/70">
+                    {% trans "Are you sure you want to delete invoice" %} <strong x-text="deleteTarget?.name"></strong>?
+                    {% trans "This action cannot be undone." %}
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-ghost btn-sm" @click="deleteConfirm = false; deleteTarget = null">
+                    {% trans "Cancel" %}
+                </button>
+                <button class="btn btn-sm color-error" @click="confirmDelete()">
+                    {% icon "trash-outline" %}
+                    {% trans "Delete" %}
+                </button>
+            </div>
+        </div>
+    </div>
 
-    <!-- Invoices Table -->
-    <ion-card class="m-0">
-        <ion-card-content class="p-0">
-            <div id="invoices-table-container">
-                {% include "invoicing/partials/invoices_table.html" %}
-            </div>
-        </ion-card-content>
-    </ion-card>
 </div>
