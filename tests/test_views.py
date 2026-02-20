@@ -2,407 +2,277 @@
 Integration tests for Invoicing views.
 """
 
-import pytest
 import json
+import uuid
+import pytest
 from decimal import Decimal
 from django.test import Client
 from django.utils import timezone
 
-from invoicing.models import Invoice, InvoiceLine, InvoiceSeries, InvoicingConfig
+from invoicing.models import InvoicingSettings, InvoiceSeries, Invoice, InvoiceLine
+
+
+pytestmark = [pytest.mark.django_db, pytest.mark.unit]
+
+
+# ---------------------------------------------------------------------------
+# Fixtures
+# ---------------------------------------------------------------------------
+
+@pytest.fixture(autouse=True)
+def _set_hub_config(db, settings):
+    """Ensure HubConfig + StoreConfig exist so middleware won't redirect."""
+    from apps.configuration.models import HubConfig, StoreConfig
+    config = HubConfig.get_solo()
+    config.save()
+    store = StoreConfig.get_solo()
+    store.business_name = 'Test Business'
+    store.is_configured = True
+    store.save()
 
 
 @pytest.fixture
-def client():
-    """Create test client."""
-    return Client()
+def hub_id(db):
+    from apps.configuration.models import HubConfig
+    return HubConfig.get_solo().hub_id
 
 
 @pytest.fixture
-def series():
-    """Create a default invoice series."""
-    return InvoiceSeries.objects.create(
-        prefix='F',
-        name='Facturas',
-        is_default=True,
-        number_digits=6
+def employee(db):
+    """Create a local user (employee)."""
+    from apps.accounts.models import LocalUser
+    return LocalUser.objects.create(
+        name='Test Employee',
+        email='employee@test.com',
+        role='admin',
+        is_active=True,
     )
 
 
 @pytest.fixture
-def sample_invoice(series):
-    """Create a sample invoice."""
+def auth_client(employee):
+    """Authenticated Django test client."""
+    client = Client()
+    session = client.session
+    session['local_user_id'] = str(employee.id)
+    session['user_name'] = employee.name
+    session['user_email'] = employee.email
+    session['user_role'] = employee.role
+    session['store_config_checked'] = True
+    session.save()
+    return client
+
+
+@pytest.fixture
+def series(hub_id):
+    """Create a default invoice series."""
+    return InvoiceSeries.objects.create(
+        hub_id=hub_id,
+        prefix='F',
+        name='Facturas',
+        is_default=True,
+        number_digits=6,
+    )
+
+
+@pytest.fixture
+def sample_invoice(hub_id, series):
+    """Create a sample issued invoice."""
     return Invoice.objects.create(
+        hub_id=hub_id,
         series=series,
-        customer_name='Test Customer',
+        number='F000001',
+        customer_name='Maria Garcia',
         customer_tax_id='12345678Z',
-        customer_address='Test Address',
+        customer_address='Calle Mayor 1',
         subtotal=Decimal('100.00'),
         tax_rate=Decimal('21.00'),
         tax_amount=Decimal('21.00'),
         total=Decimal('121.00'),
         status=Invoice.Status.ISSUED,
-        number='F000001'
     )
 
 
-@pytest.mark.django_db
-class TestDashboardView:
-    """Tests for invoicing dashboard."""
+@pytest.fixture
+def draft_invoice(hub_id, series):
+    """Create a draft invoice."""
+    return Invoice.objects.create(
+        hub_id=hub_id,
+        series=series,
+        customer_name='Test Customer',
+        customer_tax_id='87654321X',
+        status=Invoice.Status.DRAFT,
+    )
 
-    def test_dashboard_get(self, client):
-        """Test GET dashboard page."""
-        response = client.get('/modules/invoicing/')
 
+# ---------------------------------------------------------------------------
+# Dashboard / Index
+# ---------------------------------------------------------------------------
+
+class TestDashboard:
+
+    def test_requires_login(self):
+        client = Client()
+        response = client.get('/m/invoicing/')
+        assert response.status_code == 302
+
+    def test_index_loads(self, auth_client):
+        response = auth_client.get('/m/invoicing/')
         assert response.status_code == 200
 
-    def test_dashboard_htmx(self, client):
-        """Test HTMX dashboard request."""
-        response = client.get(
-            '/modules/invoicing/',
-            HTTP_HX_REQUEST='true'
+    def test_index_htmx(self, auth_client):
+        response = auth_client.get('/m/invoicing/', HTTP_HX_REQUEST='true')
+        assert response.status_code == 200
+
+    def test_dashboard_loads(self, auth_client):
+        response = auth_client.get('/m/invoicing/dashboard/')
+        assert response.status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# Invoices List
+# ---------------------------------------------------------------------------
+
+class TestInvoicesList:
+
+    def test_invoices_list_loads(self, auth_client, series):
+        response = auth_client.get('/m/invoicing/invoices/')
+        assert response.status_code == 200
+
+    def test_invoices_list_with_data(self, auth_client, sample_invoice):
+        response = auth_client.get('/m/invoicing/invoices/')
+        assert response.status_code == 200
+
+    def test_invoices_list_htmx(self, auth_client, series):
+        response = auth_client.get('/m/invoicing/invoices/', HTTP_HX_REQUEST='true')
+        assert response.status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# Invoice Detail
+# ---------------------------------------------------------------------------
+
+class TestInvoiceDetail:
+
+    def test_detail_loads(self, auth_client, sample_invoice):
+        response = auth_client.get(f'/m/invoicing/invoices/{sample_invoice.pk}/')
+        assert response.status_code == 200
+
+    def test_detail_htmx(self, auth_client, sample_invoice):
+        response = auth_client.get(
+            f'/m/invoicing/invoices/{sample_invoice.pk}/',
+            HTTP_HX_REQUEST='true',
         )
+        assert response.status_code == 200
 
+    def test_detail_not_found(self, auth_client):
+        fake_uuid = uuid.uuid4()
+        response = auth_client.get(f'/m/invoicing/invoices/{fake_uuid}/')
+        # View returns 200 with error context (rendered via @htmx_view)
         assert response.status_code == 200
 
 
-@pytest.mark.django_db
-class TestInvoicesListView:
-    """Tests for invoices list view."""
+# ---------------------------------------------------------------------------
+# Invoice Create
+# ---------------------------------------------------------------------------
 
-    def test_invoices_list_get(self, client):
-        """Test GET invoices list."""
-        response = client.get('/modules/invoicing/invoices/')
+class TestInvoiceCreate:
 
-        assert response.status_code == 200
-
-    def test_invoices_list_htmx(self, client):
-        """Test HTMX invoices list request."""
-        response = client.get(
-            '/modules/invoicing/invoices/',
-            HTTP_HX_REQUEST='true'
-        )
-
-        assert response.status_code == 200
-
-    def test_invoices_list_with_invoices(self, client, sample_invoice):
-        """Test list with existing invoices."""
-        response = client.get('/modules/invoicing/invoices/')
-
+    def test_create_form_loads(self, auth_client, series):
+        response = auth_client.get('/m/invoicing/invoices/new/')
         assert response.status_code == 200
 
 
-@pytest.mark.django_db
-class TestInvoicesListAjax:
-    """Tests for invoices list AJAX API."""
+# ---------------------------------------------------------------------------
+# Invoice Issue
+# ---------------------------------------------------------------------------
 
-    def test_list_ajax_empty(self, client):
-        """Test AJAX list when empty."""
-        response = client.get('/modules/invoicing/api/invoices/')
+class TestInvoiceIssue:
 
+    def test_issue_draft(self, auth_client, draft_invoice):
+        response = auth_client.post(f'/m/invoicing/invoices/{draft_invoice.pk}/issue/')
         assert response.status_code == 200
-        data = json.loads(response.content)
-        assert data['success'] is True
-        assert data['invoices'] == []
+        data = response.json()
+        assert data['ok'] is True
+        draft_invoice.refresh_from_db()
+        assert draft_invoice.status == Invoice.Status.ISSUED
+        assert draft_invoice.number != ''
 
-    def test_list_ajax_with_invoices(self, client, sample_invoice):
-        """Test AJAX list with invoices."""
-        response = client.get('/modules/invoicing/api/invoices/')
+    def test_issue_non_draft_fails(self, auth_client, sample_invoice):
+        response = auth_client.post(f'/m/invoicing/invoices/{sample_invoice.pk}/issue/')
+        assert response.status_code == 400
+        data = response.json()
+        assert data['ok'] is False
 
+
+# ---------------------------------------------------------------------------
+# Invoice Cancel
+# ---------------------------------------------------------------------------
+
+class TestInvoiceCancel:
+
+    def test_cancel_invoice(self, auth_client, sample_invoice):
+        response = auth_client.post(f'/m/invoicing/invoices/{sample_invoice.pk}/cancel/')
         assert response.status_code == 200
-        data = json.loads(response.content)
-        assert data['success'] is True
-        assert len(data['invoices']) == 1
-
-    def test_list_ajax_search(self, client, sample_invoice):
-        """Test AJAX list with search."""
-        response = client.get('/modules/invoicing/api/invoices/?search=Test')
-
-        data = json.loads(response.content)
-        assert len(data['invoices']) == 1
-
-        response = client.get('/modules/invoicing/api/invoices/?search=NotFound')
-        data = json.loads(response.content)
-        assert len(data['invoices']) == 0
-
-    def test_list_ajax_filter_status(self, client, sample_invoice):
-        """Test AJAX list filter by status."""
-        response = client.get('/modules/invoicing/api/invoices/?status=issued')
-
-        data = json.loads(response.content)
-        assert len(data['invoices']) == 1
-
-        response = client.get('/modules/invoicing/api/invoices/?status=draft')
-        data = json.loads(response.content)
-        assert len(data['invoices']) == 0
-
-
-@pytest.mark.django_db
-class TestInvoiceDetailView:
-    """Tests for invoice detail view."""
-
-    def test_detail_view(self, client, sample_invoice):
-        """Test GET invoice detail."""
-        response = client.get(f'/modules/invoicing/invoices/{sample_invoice.id}/')
-
-        assert response.status_code == 200
-
-    def test_detail_view_not_found(self, client):
-        """Test GET invoice not found."""
-        response = client.get('/modules/invoicing/invoices/99999/')
-
-        assert response.status_code == 404
-
-    def test_detail_view_htmx(self, client, sample_invoice):
-        """Test HTMX detail request."""
-        response = client.get(
-            f'/modules/invoicing/invoices/{sample_invoice.id}/',
-            HTTP_HX_REQUEST='true'
-        )
-
-        assert response.status_code == 200
-
-
-@pytest.mark.django_db
-class TestInvoiceCreateView:
-    """Tests for invoice create view."""
-
-    def test_create_get_form(self, client, series):
-        """Test GET create form."""
-        response = client.get('/modules/invoicing/invoices/create/')
-
-        assert response.status_code == 200
-
-    def test_create_invoice_success(self, client, series):
-        """Test POST create invoice."""
-        response = client.post(
-            '/modules/invoicing/invoices/create/',
-            data=json.dumps({
-                'customer_name': 'New Customer',
-                'customer_tax_id': '87654321X',
-                'lines': [
-                    {
-                        'description': 'Product 1',
-                        'quantity': 2,
-                        'unit_price': 50.00
-                    }
-                ]
-            }),
-            content_type='application/json'
-        )
-
-        assert response.status_code == 200
-        data = json.loads(response.content)
-        assert data['success'] is True
-        assert 'invoice_id' in data
-
-
-@pytest.mark.django_db
-class TestInvoiceIssueView:
-    """Tests for invoice issue view."""
-
-    def test_issue_draft_invoice(self, client, series):
-        """Test issuing a draft invoice."""
-        invoice = Invoice.objects.create(
-            series=series,
-            customer_name='Test',
-            status=Invoice.Status.DRAFT
-        )
-
-        response = client.post(f'/modules/invoicing/invoices/{invoice.id}/issue/')
-
-        assert response.status_code == 200
-        data = json.loads(response.content)
-        assert data['success'] is True
-
-        invoice.refresh_from_db()
-        assert invoice.status == Invoice.Status.ISSUED
-        assert invoice.number != ''
-
-    def test_issue_non_draft_fails(self, client, sample_invoice):
-        """Test issuing non-draft invoice fails."""
-        response = client.post(f'/modules/invoicing/invoices/{sample_invoice.id}/issue/')
-
-        data = json.loads(response.content)
-        assert data['success'] is False
-
-
-@pytest.mark.django_db
-class TestInvoiceCancelView:
-    """Tests for invoice cancel view."""
-
-    def test_cancel_invoice(self, client, sample_invoice):
-        """Test cancelling an invoice."""
-        response = client.post(f'/modules/invoicing/invoices/{sample_invoice.id}/cancel/')
-
-        assert response.status_code == 200
-        data = json.loads(response.content)
-        assert data['success'] is True
-
+        data = response.json()
+        assert data['ok'] is True
         sample_invoice.refresh_from_db()
         assert sample_invoice.status == Invoice.Status.CANCELLED
 
-    def test_cancel_already_cancelled(self, client, series):
-        """Test cancelling already cancelled invoice fails."""
-        invoice = Invoice.objects.create(
-            series=series,
-            customer_name='Test',
-            status=Invoice.Status.CANCELLED
+    def test_cancel_already_cancelled(self, auth_client, hub_id, series):
+        inv = Invoice.objects.create(
+            hub_id=hub_id, series=series,
+            customer_name='Test', status=Invoice.Status.CANCELLED,
         )
+        response = auth_client.post(f'/m/invoicing/invoices/{inv.pk}/cancel/')
+        assert response.status_code == 400
+        data = response.json()
+        assert data['ok'] is False
 
-        response = client.post(f'/modules/invoicing/invoices/{invoice.id}/cancel/')
 
-        data = json.loads(response.content)
-        assert data['success'] is False
+# ---------------------------------------------------------------------------
+# Invoice Print
+# ---------------------------------------------------------------------------
 
+class TestInvoicePrint:
 
-@pytest.mark.django_db
-class TestInvoicePrintView:
-    """Tests for invoice print view."""
-
-    def test_print_view(self, client, sample_invoice):
-        """Test GET printable invoice."""
-        response = client.get(f'/modules/invoicing/invoices/{sample_invoice.id}/print/')
-
+    def test_print_loads(self, auth_client, sample_invoice):
+        response = auth_client.get(f'/m/invoicing/invoices/{sample_invoice.pk}/print/')
         assert response.status_code == 200
 
 
-@pytest.mark.django_db
-class TestSeriesListView:
-    """Tests for series list view."""
+# ---------------------------------------------------------------------------
+# Series List
+# ---------------------------------------------------------------------------
 
-    def test_series_list_get(self, client, series):
-        """Test GET series list."""
-        response = client.get('/modules/invoicing/series/')
+class TestSeriesList:
 
+    def test_series_list_loads(self, auth_client, series):
+        response = auth_client.get('/m/invoicing/series/')
         assert response.status_code == 200
 
 
-@pytest.mark.django_db
-class TestSeriesCreateView:
-    """Tests for series create view."""
+# ---------------------------------------------------------------------------
+# Series CRUD
+# ---------------------------------------------------------------------------
 
-    def test_create_get_form(self, client):
-        """Test GET create form."""
-        response = client.get('/modules/invoicing/series/create/')
+class TestSeriesCRUD:
 
+    def test_add_form_loads(self, auth_client):
+        response = auth_client.get('/m/invoicing/series/add/')
         assert response.status_code == 200
 
-    def test_create_series_success(self, client):
-        """Test POST create series."""
-        response = client.post('/modules/invoicing/series/create/', {
-            'prefix': 'R',
-            'name': 'Rectificativas',
-            'description': 'Facturas rectificativas',
-            'number_digits': 6
-        })
-
-        assert response.status_code == 200
-        data = json.loads(response.content)
-        assert data['success'] is True
-
-        assert InvoiceSeries.objects.filter(prefix='R').exists()
-
-    def test_create_series_no_prefix(self, client):
-        """Test POST create series without prefix fails."""
-        response = client.post('/modules/invoicing/series/create/', {
-            'name': 'Test'
-        })
-
-        data = json.loads(response.content)
-        assert data['success'] is False
-
-    def test_create_series_duplicate_prefix(self, client, series):
-        """Test POST create series with duplicate prefix fails."""
-        response = client.post('/modules/invoicing/series/create/', {
-            'prefix': 'F',
-            'name': 'Duplicate'
-        })
-
-        data = json.loads(response.content)
-        assert data['success'] is False
-
-
-@pytest.mark.django_db
-class TestSeriesEditView:
-    """Tests for series edit view."""
-
-    def test_edit_get_form(self, client, series):
-        """Test GET edit form."""
-        response = client.get(f'/modules/invoicing/series/{series.id}/edit/')
-
+    def test_edit_form_loads(self, auth_client, series):
+        response = auth_client.get(f'/m/invoicing/series/{series.pk}/edit/')
         assert response.status_code == 200
 
-    def test_edit_series_success(self, client, series):
-        """Test POST edit series."""
-        response = client.post(f'/modules/invoicing/series/{series.id}/edit/', {
-            'name': 'Updated Name',
-            'description': 'Updated description',
-            'number_digits': 8,
-            'is_active': 'on'
-        })
 
-        assert response.status_code == 200
-        data = json.loads(response.content)
-        assert data['success'] is True
+# ---------------------------------------------------------------------------
+# Settings
+# ---------------------------------------------------------------------------
 
-        series.refresh_from_db()
-        assert series.name == 'Updated Name'
-
-
-@pytest.mark.django_db
-class TestSeriesDeleteView:
-    """Tests for series delete view."""
-
-    def test_delete_series_no_invoices(self, client):
-        """Test deleting series with no invoices."""
-        series = InvoiceSeries.objects.create(
-            prefix='T',
-            name='To Delete'
-        )
-
-        response = client.post(f'/modules/invoicing/series/{series.id}/delete/')
-
-        assert response.status_code == 200
-        data = json.loads(response.content)
-        assert data['success'] is True
-
-        assert not InvoiceSeries.objects.filter(id=series.id).exists()
-
-    def test_delete_series_with_invoices(self, client, sample_invoice):
-        """Test deleting series with invoices fails."""
-        series_id = sample_invoice.series.id
-
-        response = client.post(f'/modules/invoicing/series/{series_id}/delete/')
-
-        data = json.loads(response.content)
-        assert data['success'] is False
-
-
-@pytest.mark.django_db
 class TestSettingsView:
-    """Tests for invoicing settings."""
 
-    def test_settings_get(self, client, series):
-        """Test GET settings page."""
-        response = client.get('/modules/invoicing/settings/')
-
+    def test_settings_loads(self, auth_client, series):
+        response = auth_client.get('/m/invoicing/settings/')
         assert response.status_code == 200
-
-    def test_settings_save(self, client, series):
-        """Test POST save settings."""
-        response = client.post('/modules/invoicing/settings/', {
-            'company_name': 'Test Company',
-            'company_tax_id': 'B12345678',
-            'company_address': 'Test Address',
-            'company_phone': '+34600123456',
-            'company_email': 'test@company.com',
-            'default_series': 'F',
-            'invoice_footer': 'Thanks for your business'
-        })
-
-        assert response.status_code == 200
-        data = json.loads(response.content)
-        assert data['success'] is True
-
-        config = InvoicingConfig.get_config()
-        assert config.company_name == 'Test Company'

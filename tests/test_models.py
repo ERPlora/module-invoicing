@@ -6,425 +6,423 @@ import pytest
 from decimal import Decimal
 from django.utils import timezone
 
-from invoicing.models import InvoicingConfig, InvoiceSeries, Invoice, InvoiceLine
+from invoicing.models import InvoicingSettings, InvoiceSeries, Invoice, InvoiceLine
 
 
-@pytest.mark.django_db
-class TestInvoicingConfig:
-    """Tests for InvoicingConfig singleton model."""
-
-    def test_get_config_creates_singleton(self):
-        """Test get_config creates singleton if not exists."""
-        config = InvoicingConfig.get_config()
-
-        assert config is not None
-        assert config.pk == 1
-
-    def test_get_config_returns_existing(self):
-        """Test get_config returns existing config."""
-        config1 = InvoicingConfig.get_config()
-        config2 = InvoicingConfig.get_config()
-
-        assert config1.pk == config2.pk
-
-    def test_default_values(self):
-        """Test default configuration values."""
-        config = InvoicingConfig.get_config()
-
-        assert config.default_series == 'F'
-        assert config.auto_generate_invoice is False
-        assert config.require_customer is True
-
-    def test_str_representation(self):
-        """Test string representation."""
-        config = InvoicingConfig.get_config()
-
-        assert str(config) == 'Invoicing Configuration'
-
-    def test_save_forces_singleton(self):
-        """Test saving always uses pk=1."""
-        config = InvoicingConfig(pk=999, company_name="Test")
-        config.save()
-
-        assert config.pk == 1
+pytestmark = [pytest.mark.django_db, pytest.mark.unit]
 
 
-@pytest.mark.django_db
+# ---------------------------------------------------------------------------
+# Fixtures
+# ---------------------------------------------------------------------------
+
+@pytest.fixture
+def hub_id(hub_config):
+    """Hub ID from HubConfig singleton."""
+    return hub_config.hub_id
+
+
+@pytest.fixture
+def series(hub_id):
+    """Create an invoice series."""
+    return InvoiceSeries.objects.create(
+        hub_id=hub_id,
+        prefix='F',
+        name='Facturas',
+        number_digits=6,
+        is_default=True,
+    )
+
+
+@pytest.fixture
+def draft_invoice(hub_id, series):
+    """Create a draft invoice."""
+    return Invoice.objects.create(
+        hub_id=hub_id,
+        series=series,
+        customer_name='Test Customer',
+        customer_tax_id='12345678Z',
+        customer_address='Calle Mayor 1',
+        status=Invoice.Status.DRAFT,
+    )
+
+
+@pytest.fixture
+def issued_invoice(hub_id, series):
+    """Create an issued invoice with a number."""
+    inv = Invoice.objects.create(
+        hub_id=hub_id,
+        series=series,
+        customer_name='Maria Garcia',
+        customer_tax_id='87654321X',
+        customer_address='Calle Sol 5',
+        status=Invoice.Status.DRAFT,
+    )
+    inv.issue()
+    return inv
+
+
+# ---------------------------------------------------------------------------
+# InvoicingSettings
+# ---------------------------------------------------------------------------
+
+class TestInvoicingSettings:
+    """Tests for InvoicingSettings model."""
+
+    def test_get_settings_creates(self, hub_id):
+        s = InvoicingSettings.get_settings(hub_id)
+        assert s is not None
+        assert s.hub_id == hub_id
+
+    def test_get_settings_returns_existing(self, hub_id):
+        s1 = InvoicingSettings.get_settings(hub_id)
+        s2 = InvoicingSettings.get_settings(hub_id)
+        assert s1.pk == s2.pk
+
+    def test_default_values(self, hub_id):
+        s = InvoicingSettings.get_settings(hub_id)
+        assert s.default_series_prefix == 'F'
+        assert s.auto_generate_invoice is False
+        assert s.require_customer is True
+        assert s.company_name == ''
+        assert s.company_tax_id == ''
+        assert s.invoice_footer == ''
+
+    def test_str(self, hub_id):
+        s = InvoicingSettings.get_settings(hub_id)
+        assert 'Invoicing Settings' in str(s)
+
+    def test_update_company_data(self, hub_id):
+        s = InvoicingSettings.get_settings(hub_id)
+        s.company_name = 'Test Company SL'
+        s.company_tax_id = 'B12345678'
+        s.company_address = 'Business St 42'
+        s.company_phone = '+34600123456'
+        s.company_email = 'admin@test.com'
+        s.save()
+
+        refreshed = InvoicingSettings.get_settings(hub_id)
+        assert refreshed.company_name == 'Test Company SL'
+        assert refreshed.company_tax_id == 'B12345678'
+
+
+# ---------------------------------------------------------------------------
+# InvoiceSeries
+# ---------------------------------------------------------------------------
+
 class TestInvoiceSeries:
     """Tests for InvoiceSeries model."""
 
-    def test_create_series(self):
-        """Test creating an invoice series."""
-        series = InvoiceSeries.objects.create(
-            prefix='F',
-            name='Facturas',
-            number_digits=6
-        )
-
-        assert series.id is not None
+    def test_create(self, series):
         assert series.prefix == 'F'
+        assert series.name == 'Facturas'
         assert series.next_number == 1
+        assert series.is_active is True
+        assert series.is_default is True
+        assert series.number_digits == 6
 
-    def test_get_next_number(self):
-        """Test generating sequential invoice numbers."""
-        series = InvoiceSeries.objects.create(
-            prefix='F',
-            name='Facturas',
-            number_digits=6
-        )
-
+    def test_get_next_number(self, series):
         num1 = series.get_next_number()
         num2 = series.get_next_number()
         num3 = series.get_next_number()
-
         assert num1 == 'F000001'
         assert num2 == 'F000002'
         assert num3 == 'F000003'
 
-    def test_number_digits_format(self):
-        """Test different number digit formats."""
-        series = InvoiceSeries.objects.create(
-            prefix='R',
-            name='Rectificativas',
-            number_digits=4
+    def test_number_digits_format(self, hub_id):
+        s = InvoiceSeries.objects.create(
+            hub_id=hub_id, prefix='R',
+            name='Rectificativas', number_digits=4,
         )
-
-        num = series.get_next_number()
-
+        num = s.get_next_number()
         assert num == 'R0001'
 
-    def test_str_representation(self):
-        """Test string representation."""
-        series = InvoiceSeries.objects.create(
-            prefix='T',
-            name='Tickets'
+    def test_str(self, series):
+        assert str(series) == 'F - Facturas'
+
+    def test_only_one_default_per_hub(self, hub_id, series):
+        """Saving a new series as default should un-default the old one."""
+        s2 = InvoiceSeries.objects.create(
+            hub_id=hub_id, prefix='R',
+            name='Rectificativas', is_default=True,
         )
+        series.refresh_from_db()
+        assert series.is_default is False
+        assert s2.is_default is True
 
-        assert str(series) == 'T - Tickets'
+    def test_ordering_by_prefix(self, hub_id):
+        InvoiceSeries.objects.create(hub_id=hub_id, prefix='Z', name='Z Series')
+        InvoiceSeries.objects.create(hub_id=hub_id, prefix='A', name='A Series')
+        InvoiceSeries.objects.create(hub_id=hub_id, prefix='M', name='M Series')
+        series_list = list(InvoiceSeries.objects.filter(hub_id=hub_id))
+        prefixes = [s.prefix for s in series_list]
+        assert prefixes == sorted(prefixes)
 
-    def test_default_is_active(self):
-        """Test series is active by default."""
-        series = InvoiceSeries.objects.create(
-            prefix='F',
-            name='Facturas'
+    def test_unique_prefix_per_hub(self, hub_id, series):
+        """Cannot create two series with same prefix for same hub (constraint in Meta)."""
+        # Verify unique_together constraint is declared in Meta
+        unique = InvoiceSeries._meta.unique_together
+        assert ('hub_id', 'prefix') in unique
+
+    def test_soft_delete(self, hub_id):
+        s = InvoiceSeries.objects.create(
+            hub_id=hub_id, prefix='T', name='Tickets',
         )
-
-        assert series.is_active is True
-
-    def test_only_one_default_series(self):
-        """Test only one series can be default."""
-        series1 = InvoiceSeries.objects.create(
-            prefix='F',
-            name='Facturas',
-            is_default=True
-        )
-        series2 = InvoiceSeries.objects.create(
-            prefix='R',
-            name='Rectificativas',
-            is_default=True
-        )
-
-        series1.refresh_from_db()
-
-        assert series1.is_default is False
-        assert series2.is_default is True
-
-    def test_ordering_by_prefix(self):
-        """Test series are ordered by prefix."""
-        InvoiceSeries.objects.create(prefix='Z', name='Z Series')
-        InvoiceSeries.objects.create(prefix='A', name='A Series')
-        InvoiceSeries.objects.create(prefix='M', name='M Series')
-
-        series = list(InvoiceSeries.objects.all())
-
-        assert series[0].prefix == 'A'
-        assert series[1].prefix == 'M'
-        assert series[2].prefix == 'Z'
+        s.delete()
+        assert s.is_deleted is True
+        assert InvoiceSeries.objects.filter(pk=s.pk).count() == 0
+        assert InvoiceSeries.all_objects.filter(pk=s.pk).count() == 1
 
 
-@pytest.mark.django_db
+# ---------------------------------------------------------------------------
+# Invoice
+# ---------------------------------------------------------------------------
+
 class TestInvoice:
     """Tests for Invoice model."""
 
-    @pytest.fixture
-    def series(self):
-        """Create a series for testing."""
-        return InvoiceSeries.objects.create(
-            prefix='F',
-            name='Facturas',
-            number_digits=6
+    def test_create_draft(self, draft_invoice):
+        assert draft_invoice.status == Invoice.Status.DRAFT
+        assert draft_invoice.number == ''
+        assert draft_invoice.customer_name == 'Test Customer'
+
+    def test_default_values(self, hub_id, series):
+        inv = Invoice.objects.create(
+            hub_id=hub_id, series=series, customer_name='Test',
         )
+        assert inv.status == Invoice.Status.DRAFT
+        assert inv.invoice_type == Invoice.InvoiceType.INVOICE
+        assert inv.subtotal == Decimal('0.00')
+        assert inv.tax_rate == Decimal('21.00')
+        assert inv.tax_amount == Decimal('0.00')
+        assert inv.total == Decimal('0.00')
+        assert inv.paid_amount == Decimal('0.00')
 
-    def test_create_draft_invoice(self, series):
-        """Test creating a draft invoice."""
-        invoice = Invoice.objects.create(
-            series=series,
-            customer_name='Test Customer',
-            customer_tax_id='12345678Z'
+    def test_str_draft(self, draft_invoice):
+        result = str(draft_invoice)
+        assert 'DRAFT' in result
+        assert 'Test Customer' in result
+
+    def test_str_issued(self, issued_invoice):
+        result = str(issued_invoice)
+        assert 'F' in result
+        assert 'Maria Garcia' in result
+
+    def test_issue_draft_to_issued(self, draft_invoice):
+        """Test draft -> issued transition assigns number."""
+        result = draft_invoice.issue()
+        assert result is True
+        draft_invoice.refresh_from_db()
+        assert draft_invoice.status == Invoice.Status.ISSUED
+        assert draft_invoice.number.startswith('F')
+        assert len(draft_invoice.number) == 7  # F + 6 digits
+
+    def test_issue_non_draft_fails(self, issued_invoice):
+        """Cannot issue an already-issued invoice."""
+        result = issued_invoice.issue()
+        assert result is False
+
+    def test_issue_cancelled_fails(self, hub_id, series):
+        """Cannot issue a cancelled invoice."""
+        inv = Invoice.objects.create(
+            hub_id=hub_id, series=series, customer_name='Test',
+            status=Invoice.Status.CANCELLED,
         )
+        result = inv.issue()
+        assert result is False
 
-        assert invoice.id is not None
-        assert invoice.status == Invoice.Status.DRAFT
-        assert invoice.number == ''  # No number for drafts
-
-    def test_invoice_number_generated_on_issue(self, series):
-        """Test invoice number is generated when status changes from draft."""
-        invoice = Invoice.objects.create(
-            series=series,
-            customer_name='Test Customer',
-            status=Invoice.Status.ISSUED
-        )
-
-        assert invoice.number.startswith('F')
-        assert len(invoice.number) == 7  # F + 6 digits
-
-    def test_default_values(self, series):
-        """Test default invoice values."""
-        invoice = Invoice.objects.create(
-            series=series,
-            customer_name='Test'
-        )
-
-        assert invoice.status == Invoice.Status.DRAFT
-        assert invoice.invoice_type == Invoice.InvoiceType.INVOICE
-        assert invoice.subtotal == Decimal('0.00')
-        assert invoice.tax_rate == Decimal('21.00')
-        assert invoice.tax_amount == Decimal('0.00')
-        assert invoice.total == Decimal('0.00')
-
-    def test_str_representation(self, series):
-        """Test string representation."""
-        invoice = Invoice.objects.create(
-            series=series,
-            customer_name='Test Customer',
-            status=Invoice.Status.ISSUED
-        )
-
-        assert 'Test Customer' in str(invoice)
-
-    def test_status_choices(self, series):
-        """Test all status choices are valid."""
-        for status, label in Invoice.Status.choices:
-            invoice = Invoice.objects.create(
-                series=series,
-                customer_name='Test',
-                status=status
+    def test_all_status_choices(self, hub_id, series):
+        for status, _ in Invoice.Status.choices:
+            inv = Invoice.objects.create(
+                hub_id=hub_id, series=series,
+                customer_name='Test', status=status,
             )
-            assert invoice.status == status
+            assert inv.status == status
 
-    def test_invoice_type_choices(self, series):
-        """Test all invoice type choices are valid."""
-        for inv_type, label in Invoice.InvoiceType.choices:
-            invoice = Invoice.objects.create(
-                series=series,
-                customer_name='Test',
-                invoice_type=inv_type
+    def test_all_invoice_type_choices(self, hub_id, series):
+        for inv_type, _ in Invoice.InvoiceType.choices:
+            inv = Invoice.objects.create(
+                hub_id=hub_id, series=series,
+                customer_name='Test', invoice_type=inv_type,
             )
-            assert invoice.invoice_type == inv_type
+            assert inv.invoice_type == inv_type
 
-    def test_ordering(self, series):
-        """Test invoices are ordered by issue_date descending."""
+    def test_ordering_newest_first(self, hub_id, series):
         inv1 = Invoice.objects.create(
-            series=series,
-            customer_name='First',
-            issue_date=timezone.now().date()
+            hub_id=hub_id, series=series, customer_name='First',
         )
         inv2 = Invoice.objects.create(
-            series=series,
-            customer_name='Second',
-            issue_date=timezone.now().date()
+            hub_id=hub_id, series=series, customer_name='Second',
         )
+        invoices = list(Invoice.objects.filter(hub_id=hub_id))
+        assert invoices[0].pk == inv2.pk
 
-        invoices = list(Invoice.objects.all())
+    def test_calculate_totals(self, hub_id, series):
+        """Test calculate_totals sums lines correctly."""
+        inv = Invoice.objects.create(
+            hub_id=hub_id, series=series, customer_name='Test',
+            tax_rate=Decimal('21.00'),
+        )
+        InvoiceLine.objects.create(
+            hub_id=hub_id, invoice=inv,
+            description='Product 1',
+            quantity=Decimal('2'), unit_price=Decimal('50.00'),
+        )
+        InvoiceLine.objects.create(
+            hub_id=hub_id, invoice=inv,
+            description='Product 2',
+            quantity=Decimal('1'), unit_price=Decimal('100.00'),
+        )
+        inv.calculate_totals()
+        # Line 1: 2*50 = 100, Line 2: 1*100 = 100 -> subtotal 200
+        assert inv.subtotal == Decimal('200.00')
+        # tax: 200 * 21% = 42
+        assert inv.tax_amount == Decimal('42.00')
+        # total: 200 + 42 = 242
+        assert inv.total == Decimal('242.00')
 
-        # Both have same issue_date, so ordered by created_at desc
-        assert invoices[0] == inv2
-        assert invoices[1] == inv1
+    def test_indexes(self):
+        index_fields = [idx.fields for idx in Invoice._meta.indexes]
+        assert ['hub_id', 'number'] in index_fields
+        assert ['hub_id', 'status'] in index_fields
+        assert ['hub_id', 'issue_date'] in index_fields
+        assert ['hub_id', 'customer_tax_id'] in index_fields
+
+    def test_soft_delete(self, draft_invoice):
+        draft_invoice.delete()
+        assert draft_invoice.is_deleted is True
+        assert Invoice.objects.filter(pk=draft_invoice.pk).count() == 0
+        assert Invoice.all_objects.filter(pk=draft_invoice.pk).count() == 1
 
 
-@pytest.mark.django_db
+# ---------------------------------------------------------------------------
+# InvoiceLine
+# ---------------------------------------------------------------------------
+
 class TestInvoiceLine:
     """Tests for InvoiceLine model."""
 
-    @pytest.fixture
-    def invoice(self):
-        """Create an invoice for testing lines."""
-        series = InvoiceSeries.objects.create(prefix='F', name='Facturas')
-        return Invoice.objects.create(
-            series=series,
-            customer_name='Test Customer'
-        )
-
-    def test_create_invoice_line(self, invoice):
-        """Test creating an invoice line."""
+    def test_create(self, hub_id, draft_invoice):
         line = InvoiceLine.objects.create(
-            invoice=invoice,
+            hub_id=hub_id, invoice=draft_invoice,
             description='Test Product',
-            quantity=Decimal('2'),
-            unit_price=Decimal('10.00')
+            quantity=Decimal('2'), unit_price=Decimal('10.00'),
         )
-
-        assert line.id is not None
         assert line.description == 'Test Product'
+        assert line.quantity == Decimal('2')
 
-    def test_line_total_calculation(self, invoice):
-        """Test line total is calculated on save."""
+    def test_line_total_calculation(self, hub_id, draft_invoice):
+        """Total is auto-calculated on save."""
         line = InvoiceLine.objects.create(
-            invoice=invoice,
+            hub_id=hub_id, invoice=draft_invoice,
             description='Product',
-            quantity=Decimal('3'),
-            unit_price=Decimal('10.00')
+            quantity=Decimal('3'), unit_price=Decimal('10.00'),
         )
-
         assert line.total == Decimal('30.00')
 
-    def test_line_total_with_discount(self, invoice):
-        """Test line total with discount."""
+    def test_line_total_with_discount(self, hub_id, draft_invoice):
+        """Test line total with discount percent."""
         line = InvoiceLine.objects.create(
-            invoice=invoice,
+            hub_id=hub_id, invoice=draft_invoice,
             description='Product',
-            quantity=Decimal('2'),
-            unit_price=Decimal('100.00'),
-            discount_percent=Decimal('10')  # 10% discount
+            quantity=Decimal('2'), unit_price=Decimal('100.00'),
+            discount_percent=Decimal('10'),
         )
-
         # 2 * 100 = 200, 10% discount = 20, total = 180
         assert line.total == Decimal('180.00')
 
-    def test_str_representation(self, invoice):
-        """Test string representation."""
+    def test_default_values(self, hub_id, draft_invoice):
         line = InvoiceLine.objects.create(
-            invoice=invoice,
-            description='Test Product',
-            quantity=Decimal('5'),
-            unit_price=Decimal('10.00')
+            hub_id=hub_id, invoice=draft_invoice,
+            description='Product', unit_price=Decimal('10.00'),
         )
-
-        assert 'Test Product' in str(line)
-        assert '5' in str(line)
-
-    def test_default_values(self, invoice):
-        """Test default line values."""
-        line = InvoiceLine.objects.create(
-            invoice=invoice,
-            description='Product',
-            unit_price=Decimal('10.00')
-        )
-
         assert line.quantity == Decimal('1')
         assert line.discount_percent == Decimal('0')
         assert line.tax_rate == Decimal('21.00')
+        assert line.order == 0
 
-    def test_ordering(self, invoice):
-        """Test lines are ordered by order field."""
+    def test_str(self, hub_id, draft_invoice):
+        line = InvoiceLine.objects.create(
+            hub_id=hub_id, invoice=draft_invoice,
+            description='Test Product',
+            quantity=Decimal('5'), unit_price=Decimal('10.00'),
+        )
+        result = str(line)
+        assert 'Test Product' in result
+        assert '5' in result
+
+    def test_ordering_by_order_field(self, hub_id, draft_invoice):
         line3 = InvoiceLine.objects.create(
-            invoice=invoice,
-            description='Third',
-            unit_price=10,
-            order=3
+            hub_id=hub_id, invoice=draft_invoice,
+            description='Third', unit_price=Decimal('10.00'), order=3,
         )
         line1 = InvoiceLine.objects.create(
-            invoice=invoice,
-            description='First',
-            unit_price=10,
-            order=1
+            hub_id=hub_id, invoice=draft_invoice,
+            description='First', unit_price=Decimal('10.00'), order=1,
         )
         line2 = InvoiceLine.objects.create(
-            invoice=invoice,
-            description='Second',
-            unit_price=10,
-            order=2
+            hub_id=hub_id, invoice=draft_invoice,
+            description='Second', unit_price=Decimal('10.00'), order=2,
         )
+        lines = list(draft_invoice.lines.all())
+        assert lines[0].pk == line1.pk
+        assert lines[1].pk == line2.pk
+        assert lines[2].pk == line3.pk
 
-        lines = list(invoice.lines.all())
-
-        assert lines[0] == line1
-        assert lines[1] == line2
-        assert lines[2] == line3
-
-
-@pytest.mark.django_db
-class TestInvoiceCalculateTotals:
-    """Tests for Invoice.calculate_totals method."""
-
-    @pytest.fixture
-    def invoice_with_lines(self):
-        """Create an invoice with lines for testing."""
-        series = InvoiceSeries.objects.create(prefix='F', name='Facturas')
-        invoice = Invoice.objects.create(
-            series=series,
-            customer_name='Test Customer',
-            tax_rate=Decimal('21.00')
+    def test_calculate_total_method(self, hub_id, draft_invoice):
+        """Test the calculate_total method returns and sets total."""
+        line = InvoiceLine(
+            hub_id=hub_id, invoice=draft_invoice,
+            description='Manual',
+            quantity=Decimal('4'), unit_price=Decimal('25.00'),
+            discount_percent=Decimal('5'),
         )
+        result = line.calculate_total()
+        # 4 * 25 = 100, 5% discount = 5, total = 95
+        assert result == Decimal('95.00')
+        assert line.total == Decimal('95.00')
 
-        # Add lines
-        InvoiceLine.objects.create(
-            invoice=invoice,
-            description='Product 1',
-            quantity=Decimal('2'),
-            unit_price=Decimal('50.00')
+
+# ---------------------------------------------------------------------------
+# Invoice State Transitions
+# ---------------------------------------------------------------------------
+
+class TestInvoiceStateTransitions:
+    """Tests for invoice state machine: draft -> issued -> cancelled."""
+
+    def test_draft_to_issued(self, draft_invoice):
+        assert draft_invoice.status == Invoice.Status.DRAFT
+        success = draft_invoice.issue()
+        assert success is True
+        draft_invoice.refresh_from_db()
+        assert draft_invoice.status == Invoice.Status.ISSUED
+        assert draft_invoice.number != ''
+
+    def test_issued_cannot_be_re_issued(self, issued_invoice):
+        success = issued_invoice.issue()
+        assert success is False
+        # Status remains ISSUED
+        assert issued_invoice.status == Invoice.Status.ISSUED
+
+    def test_cancelled_cannot_be_issued(self, hub_id, series):
+        inv = Invoice.objects.create(
+            hub_id=hub_id, series=series, customer_name='Test',
+            status=Invoice.Status.CANCELLED,
         )
-        InvoiceLine.objects.create(
-            invoice=invoice,
-            description='Product 2',
-            quantity=Decimal('1'),
-            unit_price=Decimal('100.00')
+        success = inv.issue()
+        assert success is False
+
+    def test_sequential_invoice_numbers(self, hub_id, series):
+        """Multiple issues from same series produce sequential numbers."""
+        inv1 = Invoice.objects.create(
+            hub_id=hub_id, series=series, customer_name='A',
         )
-
-        return invoice
-
-    def test_calculate_totals(self, invoice_with_lines):
-        """Test calculate_totals sums lines correctly."""
-        invoice_with_lines.calculate_totals()
-
-        # Line 1: 2 * 50 = 100
-        # Line 2: 1 * 100 = 100
-        # Subtotal: 200
-        assert invoice_with_lines.subtotal == Decimal('200.00')
-
-    def test_calculate_tax_amount(self, invoice_with_lines):
-        """Test tax amount calculation."""
-        invoice_with_lines.calculate_totals()
-
-        # Subtotal 200 * 21% = 42
-        assert invoice_with_lines.tax_amount == Decimal('42.00')
-
-    def test_calculate_total(self, invoice_with_lines):
-        """Test total calculation."""
-        invoice_with_lines.calculate_totals()
-
-        # Subtotal 200 + Tax 42 = 242
-        assert invoice_with_lines.total == Decimal('242.00')
-
-
-@pytest.mark.django_db
-class TestInvoiceIndexes:
-    """Tests for Invoice model indexes."""
-
-    def test_number_index_exists(self):
-        """Test number field has index."""
-        indexes = Invoice._meta.indexes
-        index_fields = [idx.fields for idx in indexes]
-
-        assert ['number'] in index_fields
-
-    def test_status_index_exists(self):
-        """Test status field has index."""
-        indexes = Invoice._meta.indexes
-        index_fields = [idx.fields for idx in indexes]
-
-        assert ['status'] in index_fields
-
-    def test_issue_date_index_exists(self):
-        """Test issue_date field has index."""
-        indexes = Invoice._meta.indexes
-        index_fields = [idx.fields for idx in indexes]
-
-        assert ['issue_date'] in index_fields
-
-    def test_customer_tax_id_index_exists(self):
-        """Test customer_tax_id field has index."""
-        indexes = Invoice._meta.indexes
-        index_fields = [idx.fields for idx in indexes]
-
-        assert ['customer_tax_id'] in index_fields
+        inv2 = Invoice.objects.create(
+            hub_id=hub_id, series=series, customer_name='B',
+        )
+        inv1.issue()
+        inv2.issue()
+        inv1.refresh_from_db()
+        inv2.refresh_from_db()
+        assert inv1.number == 'F000001'
+        assert inv2.number == 'F000002'
