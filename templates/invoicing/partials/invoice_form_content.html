@@ -1,4 +1,5 @@
 {% load djicons i18n djicons djicons %}
+<div data-back-url="{% url 'invoicing:invoices' %}" hidden></div>
 
 <script>
 window.invoiceFormApp = function() {
@@ -46,10 +47,10 @@ window.invoiceFormApp = function() {
         },
 
         async saveInvoice() {
-            if (!this.invoice.series_id) { alert('{% trans "Please select an invoice series" %}'); return; }
-            if (!this.invoice.customer_name) { alert('{% trans "Customer name is required" %}'); return; }
+            if (!this.invoice.series_id) { showToast('{% trans "Please select an invoice series" %}', 'warning'); return; }
+            if (!this.invoice.customer_name) { showToast('{% trans "Customer name is required" %}', 'warning'); return; }
             const validLines = this.invoice.lines.filter(l => l.description.trim());
-            if (validLines.length === 0) { alert('{% trans "At least one item is required" %}'); return; }
+            if (validLines.length === 0) { showToast('{% trans "At least one item is required" %}', 'warning'); return; }
 
             this.saving = true;
             const fd = new FormData();
@@ -81,10 +82,10 @@ window.invoiceFormApp = function() {
                 if (data.ok && data.id) {
                     htmx.ajax('GET', '{% url "invoicing:invoices" %}' + data.id + '/', '#main-content-area');
                 } else {
-                    alert(data.error || '{% trans "Error saving invoice" %}');
+                    showToast(data.error || '{% trans "Error saving invoice" %}', 'error');
                 }
             } catch (e) {
-                alert('{% trans "Error saving invoice" %}');
+                showToast('{% trans "Error saving invoice" %}', 'error');
             } finally {
                 this.saving = false;
             }
@@ -98,12 +99,6 @@ window.invoiceFormApp = function() {
     <!-- Page Header -->
     <div class="flex justify-between items-center mb-6">
         <div class="flex items-center gap-4">
-            <button class="btn btn-ghost"
-                hx-get="{% url 'invoicing:invoices' %}"
-                hx-target="#main-content-area"
-                hx-push-url="true">
-                {% icon "arrow-back-outline" %}
-            </button>
             <div>
                 <h1 class="text-2xl font-bold">{% trans "New Invoice" %}</h1>
                 <p class="text-sm mt-1 text-base-content/60">{% trans "Create a new draft invoice" %}</p>

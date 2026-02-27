@@ -1,4 +1,5 @@
 {% load djicons i18n djicons djicons %}
+<div data-back-url="{% url 'invoicing:invoices' %}" hidden></div>
 
 {% csrf_token %}
 <div class="p-4">
@@ -6,23 +7,11 @@
     <div class="p-6 text-center text-base-content/60">
         {% icon "alert-circle-outline" css_class="text-5xl block mx-auto mb-2 text-error" %}
         <p class="mt-2">{{ error }}</p>
-        <button class="btn btn-sm color-primary mt-3"
-            hx-get="{% url 'invoicing:invoices' %}"
-            hx-target="#main-content-area"
-            hx-push-url="true">
-            {% trans "Back to Invoices" %}
-        </button>
     </div>
     {% else %}
     <!-- Page Header -->
     <div class="flex justify-between items-center mb-6">
         <div class="flex items-center gap-4">
-            <button class="btn btn-ghost"
-                hx-get="{% url 'invoicing:invoices' %}"
-                hx-target="#main-content-area"
-                hx-push-url="true">
-                {% icon "arrow-back-outline" %}
-            </button>
             <div>
                 <h1 class="text-2xl font-bold">
                     {{ invoice.number|default:"Draft Invoice" }}
@@ -255,9 +244,9 @@ function issueInvoice() {
         if (data.ok) {
             htmx.ajax('GET', '{% url "invoicing:invoice_detail" invoice.id %}', '#main-content-area');
         } else {
-            alert(data.error || '{% trans "Error issuing invoice" %}');
+            showToast(data.error || '{% trans "Error issuing invoice" %}', 'error');
         }
-    }).catch(() => alert('{% trans "Error issuing invoice" %}'));
+    }).catch(() => showToast('{% trans "Error issuing invoice" %}', 'error'));
 }
 
 function cancelInvoice() {
@@ -269,9 +258,9 @@ function cancelInvoice() {
         if (data.ok) {
             htmx.ajax('GET', '{% url "invoicing:invoice_detail" invoice.id %}', '#main-content-area');
         } else {
-            alert(data.error || '{% trans "Error cancelling invoice" %}');
+            showToast(data.error || '{% trans "Error cancelling invoice" %}', 'error');
         }
-    }).catch(() => alert('{% trans "Error cancelling invoice" %}'));
+    }).catch(() => showToast('{% trans "Error cancelling invoice" %}', 'error'));
 }
 </script>
 {% endif %}
