@@ -17,20 +17,18 @@
                 </th>
                 <th class="datatable-th">{% trans "Number" %}</th>
                 <th class="datatable-th">{% trans "Customer" %}</th>
-                <th class="datatable-th datatable-th-sortable{% if sort_field == 'date' %} datatable-th-sorted{% if sort_dir == 'desc' %} datatable-th-sorted-desc{% endif %}{% endif %}"
+                <th class="cursor-pointer datatable-th datatable-th-sortable{% if sort_field == 'date' %} datatable-th-sorted{% if sort_dir == 'desc' %} datatable-th-sorted-desc{% endif %}{% endif %}"
                     hx-get="{% url 'invoicing:invoices' %}?sort=date&dir={% if sort_field == 'date' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}"
                     hx-target="#datatable-body"
-                    hx-include="#invoices-datatable"
-                    style="cursor: pointer;">
+                    hx-include="#invoices-datatable">
                     {% trans "Date" %}
                     <span class="datatable-sort-icon">{% icon "chevron-up-outline" %}</span>
                 </th>
                 <th class="datatable-th">{% trans "Due Date" %}</th>
-                <th class="datatable-th datatable-th-sortable{% if sort_field == 'total' %} datatable-th-sorted{% if sort_dir == 'desc' %} datatable-th-sorted-desc{% endif %}{% endif %}"
+                <th class="cursor-pointer datatable-th datatable-th-sortable{% if sort_field == 'total' %} datatable-th-sorted{% if sort_dir == 'desc' %} datatable-th-sorted-desc{% endif %}{% endif %}"
                     hx-get="{% url 'invoicing:invoices' %}?sort=total&dir={% if sort_field == 'total' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}"
                     hx-target="#datatable-body"
-                    hx-include="#invoices-datatable"
-                    style="cursor: pointer;">
+                    hx-include="#invoices-datatable">
                     {% trans "Total" %}
                     <span class="datatable-sort-icon">{% icon "chevron-up-outline" %}</span>
                 </th>

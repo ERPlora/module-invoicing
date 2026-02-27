@@ -1,9 +1,8 @@
 {% load djicons i18n djicons djicons %}
 <div data-back-url="{% url 'invoicing:invoices' %}" hidden></div>
 
-<script>
-window.invoiceFormApp = function() {
-    return {
+{% csrf_token %}
+<div x-data="{
         saving: false,
         invoice: {
             series_id: '{% for s in series_list %}{% if s.is_default %}{{ s.id }}{% endif %}{% endfor %}',
@@ -47,10 +46,10 @@ window.invoiceFormApp = function() {
         },
 
         async saveInvoice() {
-            if (!this.invoice.series_id) { showToast('{% trans "Please select an invoice series" %}', 'warning'); return; }
-            if (!this.invoice.customer_name) { showToast('{% trans "Customer name is required" %}', 'warning'); return; }
+            if (!this.invoice.series_id) { showToast('{% trans 'Please select an invoice series' %}', 'warning'); return; }
+            if (!this.invoice.customer_name) { showToast('{% trans 'Customer name is required' %}', 'warning'); return; }
             const validLines = this.invoice.lines.filter(l => l.description.trim());
-            if (validLines.length === 0) { showToast('{% trans "At least one item is required" %}', 'warning'); return; }
+            if (validLines.length === 0) { showToast('{% trans 'At least one item is required' %}', 'warning'); return; }
 
             this.saving = true;
             const fd = new FormData();
@@ -66,36 +65,31 @@ window.invoiceFormApp = function() {
             fd.append('notes', this.invoice.notes);
 
             validLines.forEach((line, i) => {
-                fd.append(`line_${i}_description`, line.description);
-                fd.append(`line_${i}_quantity`, line.quantity);
-                fd.append(`line_${i}_unit_price`, line.unit_price);
-                fd.append(`line_${i}_discount`, line.discount);
-                fd.append(`line_${i}_tax_rate`, line.tax_rate || this.invoice.tax_rate);
-                fd.append(`line_${i}_sku`, line.sku || '');
+                fd.append('line_' + i + '_description', line.description);
+                fd.append('line_' + i + '_quantity', line.quantity);
+                fd.append('line_' + i + '_unit_price', line.unit_price);
+                fd.append('line_' + i + '_discount', line.discount);
+                fd.append('line_' + i + '_tax_rate', line.tax_rate || this.invoice.tax_rate);
+                fd.append('line_' + i + '_sku', line.sku || '');
             });
 
             try {
-                const resp = await fetch('{% url "invoicing:invoice_create" %}', {
+                const resp = await fetch('{% url 'invoicing:invoice_create' %}', {
                     method: 'POST', body: fd
                 });
                 const data = await resp.json();
                 if (data.ok && data.id) {
-                    htmx.ajax('GET', '{% url "invoicing:invoices" %}' + data.id + '/', '#main-content-area');
+                    htmx.ajax('GET', '{% url 'invoicing:invoices' %}' + data.id + '/', '#main-content-area');
                 } else {
-                    showToast(data.error || '{% trans "Error saving invoice" %}', 'error');
+                    showToast(data.error || '{% trans 'Error saving invoice' %}', 'error');
                 }
             } catch (e) {
-                showToast('{% trans "Error saving invoice" %}', 'error');
+                showToast('{% trans 'Error saving invoice' %}', 'error');
             } finally {
                 this.saving = false;
             }
         }
-    }
-};
-</script>
-
-{% csrf_token %}
-<div x-data="invoiceFormApp()" class="p-4">
+    }" class="p-4">
     <!-- Page Header -->
     <div class="flex justify-between items-center mb-6">
         <div class="flex items-center gap-4">
