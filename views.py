@@ -12,7 +12,7 @@ from django.utils.translation import gettext as _
 from django.utils import timezone
 from django.contrib import messages
 
-from apps.accounts.decorators import login_required
+from apps.accounts.decorators import login_required, permission_required
 from apps.core.htmx import htmx_view
 from apps.core.services import export_to_csv, export_to_excel
 from apps.modules_runtime.navigation import with_module_nav
@@ -561,6 +561,7 @@ def series_toggle(request, pk):
 # ---------------------------------------------------------------------------
 
 @login_required
+@permission_required('invoicing.manage_settings')
 @with_module_nav('invoicing', 'settings')
 @htmx_view('invoicing/pages/settings.html', 'invoicing/partials/settings_content.html')
 def settings(request):
@@ -571,6 +572,7 @@ def settings(request):
 
 
 @login_required
+@permission_required('invoicing.manage_settings')
 @require_POST
 def settings_save(request):
     hub = _hub(request)
@@ -583,6 +585,7 @@ def settings_save(request):
 
 
 @login_required
+@permission_required('invoicing.manage_settings')
 @require_POST
 def settings_toggle(request):
     hub = _hub(request)
