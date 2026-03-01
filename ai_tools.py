@@ -83,3 +83,78 @@ class GetPendingInvoices(AssistantTool):
                 for inv in pending[:20]
             ],
         }
+
+
+@register_tool
+class GetInvoice(AssistantTool):
+    name = "get_invoice"
+    description = "Get detailed info for a specific invoice including items."
+    module_id = "invoicing"
+    required_permission = "invoicing.view_invoice"
+    parameters = {
+        "type": "object",
+        "properties": {
+            "invoice_id": {"type": "string"}, "number": {"type": "string"},
+        },
+        "required": [],
+        "additionalProperties": False,
+    }
+
+    def execute(self, args, request):
+        from invoicing.models import Invoice
+        if args.get('invoice_id'):
+            inv = Invoice.objects.get(id=args['invoice_id'])
+        elif args.get('number'):
+            inv = Invoice.objects.get(number=args['number'])
+        else:
+            return {"error": "Provide invoice_id or number"}
+        items = inv.items.all()
+        return {
+            "id": str(inv.id), "number": inv.number, "status": inv.status,
+            "customer_name": inv.customer_name, "customer_tax_id": inv.customer_tax_id,
+            "subtotal": str(inv.subtotal), "tax_amount": str(inv.tax_amount), "total": str(inv.total),
+            "issue_date": str(inv.issue_date) if inv.issue_date else None,
+            "due_date": str(inv.due_date) if inv.due_date else None,
+            "items": [
+                {"description": i.description, "quantity": i.quantity, "unit_price": str(i.unit_price), "total": str(i.total)}
+                for i in items
+            ],
+        }
+
+
+@register_tool
+class GetInvoicingSummary(AssistantTool):
+    name = "get_invoicing_summary"
+    description = "Get invoicing summary: total invoiced, total paid, total pending, by period."
+    module_id = "invoicing"
+    required_permission = "invoicing.view_invoice"
+    parameters = {
+        "type": "object",
+        "properties": {
+            "date_from": {"type": "string"}, "date_to": {"type": "string"},
+        },
+        "required": [],
+        "additionalProperties": False,
+    }
+
+    def execute(self, args, request):
+        from datetime import date
+        from django.db.models import Sum, Count, Q
+        from invoicing.models import Invoice
+        qs = Invoice.objects.all()
+        if args.get('date_from'):
+            qs = qs.filter(issue_date__gte=args['date_from'])
+        if args.get('date_to'):
+            qs = qs.filter(issue_date__lte=args['date_to'])
+        stats = qs.aggregate(
+            total_invoiced=Sum('total'),
+            total_paid=Sum('total', filter=Q(status='paid')),
+            total_pending=Sum('total', filter=Q(status='issued')),
+            count=Count('id'),
+        )
+        return {
+            "total_invoiced": str(stats['total_invoiced'] or 0),
+            "total_paid": str(stats['total_paid'] or 0),
+            "total_pending": str(stats['total_pending'] or 0),
+            "invoice_count": stats['count'],
+        }
