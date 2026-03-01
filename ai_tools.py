@@ -108,7 +108,7 @@ class GetInvoice(AssistantTool):
             inv = Invoice.objects.get(number=args['number'])
         else:
             return {"error": "Provide invoice_id or number"}
-        items = inv.items.all()
+        items = inv.lines.all()
         return {
             "id": str(inv.id), "number": inv.number, "status": inv.status,
             "customer_name": inv.customer_name, "customer_tax_id": inv.customer_tax_id,
@@ -158,3 +158,129 @@ class GetInvoicingSummary(AssistantTool):
             "total_pending": str(stats['total_pending'] or 0),
             "invoice_count": stats['count'],
         }
+
+
+@register_tool
+class CreateInvoice(AssistantTool):
+    name = "create_invoice"
+    description = "Create a new invoice with line items."
+    module_id = "invoicing"
+    required_permission = "invoicing.change_invoice"
+    requires_confirmation = True
+    examples = [
+        {"customer_name": "María García", "lines": [{"description": "Corte + Peinado", "quantity": 1, "unit_price": "25.00"}]},
+    ]
+    parameters = {
+        "type": "object",
+        "properties": {
+            "customer_name": {"type": "string", "description": "Customer name"},
+            "customer_tax_id": {"type": "string", "description": "Customer tax ID / VAT"},
+            "customer_email": {"type": "string", "description": "Customer email"},
+            "customer_address": {"type": "string", "description": "Customer address"},
+            "invoice_type": {"type": "string", "description": "Type: invoice, simplified, rectifying"},
+            "due_date": {"type": "string", "description": "Due date (YYYY-MM-DD)"},
+            "notes": {"type": "string", "description": "Invoice notes"},
+            "tax_rate": {"type": "number", "description": "Tax rate percentage (default from settings)"},
+            "lines": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "description": {"type": "string"},
+                        "quantity": {"type": "number"},
+                        "unit_price": {"type": "string"},
+                        "discount_percent": {"type": "number"},
+                    },
+                    "required": ["description", "unit_price"],
+                },
+                "description": "Line items",
+            },
+        },
+        "required": ["customer_name", "lines"],
+        "additionalProperties": False,
+    }
+
+    def execute(self, args, request):
+        from decimal import Decimal
+        from invoicing.models import Invoice, InvoiceLine, InvoiceSeries
+        series = InvoiceSeries.objects.filter(is_default=True, is_active=True).first()
+        if not series:
+            series = InvoiceSeries.objects.filter(is_active=True).first()
+        if not series:
+            return {"error": "No invoice series configured"}
+
+        inv = Invoice.objects.create(
+            series=series,
+            customer_name=args['customer_name'],
+            customer_tax_id=args.get('customer_tax_id', ''),
+            customer_email=args.get('customer_email', ''),
+            customer_address=args.get('customer_address', ''),
+            invoice_type=args.get('invoice_type', 'invoice'),
+            notes=args.get('notes', ''),
+            tax_rate=Decimal(str(args.get('tax_rate', 21))),
+        )
+        if args.get('due_date'):
+            inv.due_date = args['due_date']
+            inv.save(update_fields=['due_date'])
+
+        for i, line in enumerate(args.get('lines', [])):
+            InvoiceLine.objects.create(
+                invoice=inv,
+                description=line['description'],
+                quantity=Decimal(str(line.get('quantity', 1))),
+                unit_price=Decimal(line['unit_price']),
+                discount_percent=Decimal(str(line.get('discount_percent', 0))),
+                tax_rate=inv.tax_rate,
+                order=i,
+            )
+        inv.calculate_totals()
+        inv.save()
+        return {"id": str(inv.id), "number": inv.number, "total": str(inv.total), "created": True}
+
+
+@register_tool
+class UpdateInvoiceStatus(AssistantTool):
+    name = "update_invoice_status"
+    description = "Update invoice status: issue (draft→issued), mark paid, or cancel."
+    module_id = "invoicing"
+    required_permission = "invoicing.change_invoice"
+    requires_confirmation = True
+    parameters = {
+        "type": "object",
+        "properties": {
+            "invoice_id": {"type": "string", "description": "Invoice ID"},
+            "number": {"type": "string", "description": "Invoice number (alternative to ID)"},
+            "status": {"type": "string", "description": "New status: issued, paid, cancelled"},
+            "payment_method": {"type": "string", "description": "Payment method (when marking as paid)"},
+        },
+        "required": ["status"],
+        "additionalProperties": False,
+    }
+
+    def execute(self, args, request):
+        from django.utils import timezone
+        from invoicing.models import Invoice
+        if args.get('invoice_id'):
+            inv = Invoice.objects.get(id=args['invoice_id'])
+        elif args.get('number'):
+            inv = Invoice.objects.get(number=args['number'])
+        else:
+            return {"error": "Provide invoice_id or number"}
+
+        new_status = args['status']
+        if new_status == 'issued' and inv.status == 'draft':
+            inv.status = 'issued'
+            inv.save(update_fields=['status'])
+        elif new_status == 'paid':
+            inv.status = 'paid'
+            inv.paid_amount = inv.total
+            inv.paid_at = timezone.now()
+            if args.get('payment_method'):
+                inv.payment_method = args['payment_method']
+            inv.save(update_fields=['status', 'paid_amount', 'paid_at', 'payment_method'])
+        elif new_status == 'cancelled':
+            inv.status = 'cancelled'
+            inv.save(update_fields=['status'])
+        else:
+            return {"error": f"Cannot transition from '{inv.status}' to '{new_status}'"}
+        return {"id": str(inv.id), "number": inv.number, "status": inv.status}
