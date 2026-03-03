@@ -33,3 +33,22 @@ PERMISSIONS = [
 
 # Module Dependencies
 DEPENDENCIES = ['customers', 'sales', 'inventory']
+
+ROLE_PERMISSIONS = {
+    "admin": ["*"],
+    "manager": [
+        "add_invoice",
+        "add_series",
+        "change_invoice",
+        "change_series",
+        "view_invoice",
+        "view_reports",
+        "view_series",
+        "void_invoice",
+    ],
+    "employee": [
+        "add_invoice",
+        "view_invoice",
+        "view_series",
+    ],
+}
