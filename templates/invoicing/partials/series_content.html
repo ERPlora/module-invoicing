@@ -1,17 +1,8 @@
 {% load djicons i18n djicons djicons %}
 
 <div x-data="{
-    panelOpen: false,
-    editUrl: '',
     deleteConfirm: false,
-    deleteTarget: null,
-    openPanel(url) {
-        this.editUrl = url;
-        htmx.ajax('GET', url, { target: '#series-panel-content', swap: 'innerHTML' });
-        this.panelOpen = true;
-    },
-    closePanel() {
-        this.panelOpen = false;
+    deleteTarget: null);
     },
     confirmDelete() {
         if (this.deleteTarget) {
@@ -47,7 +38,7 @@
             <div class="datatable-toolbar-end">
                 <!-- Add Series -->
                 <button class="btn btn-sm btn-circle color-primary"
-                        @click="openPanel('{% url 'invoicing:series_add' %}')"
+                        hx-get="{% url 'invoicing:series_add' %}" hx-target="#main-content-area" hx-push-url="true"
                         title="{% trans 'Add Series' %}">
                     {% icon "add-outline" %}
                 </button>
@@ -63,13 +54,6 @@
         <!-- Datatable Body (HTMX swap target) -->
         <div id="datatable-body">
             {% include "invoicing/partials/series_table.html" %}
-        </div>
-    </div>
-
-    <!-- Side Sheet -->
-    <div class="sheet-backdrop" :class="{ 'is-open': panelOpen }" @click.self="closePanel()">
-        <div class="side-sheet side-sheet-right" id="series-panel-content">
-            <!-- Content loaded via HTMX -->
         </div>
     </div>
 

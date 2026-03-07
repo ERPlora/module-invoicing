@@ -31,7 +31,7 @@
             <tr class="datatable-tr">
                 <td class="datatable-td" data-label="{% trans 'Prefix' %}">
                     <div class="flex items-center gap-3 cursor-pointer"
-                         @click="openPanel('{% url 'invoicing:series_edit' series.id %}')">
+                         hx-get="{% url 'invoicing:series_edit' series.id %}" hx-target="#main-content-area" hx-push-url="true">
                         <div class="w-10 h-10 flex items-center justify-center rounded-lg font-bold text-sm bg-primary/10 text-primary">
                             {{ series.prefix }}
                         </div>
@@ -42,7 +42,7 @@
                 </td>
                 <td class="datatable-td" data-label="{% trans 'Name' %}">
                     <span class="font-medium cursor-pointer"
-                          @click="openPanel('{% url 'invoicing:series_edit' series.id %}')">
+                          hx-get="{% url 'invoicing:series_edit' series.id %}" hx-target="#main-content-area" hx-push-url="true">
                         {{ series.name }}
                     </span>
                     {% if series.description %}
@@ -68,7 +68,7 @@
                 <td class="datatable-td datatable-td-actions">
                     <div class="datatable-row-actions">
                         <button class="datatable-row-action"
-                                @click="openPanel('{% url 'invoicing:series_edit' series.id %}')"
+                                hx-get="{% url 'invoicing:series_edit' series.id %}" hx-target="#main-content-area" hx-push-url="true"
                                 title="{% trans 'Edit' %}">
                             {% icon "create-outline" %}
                         </button>
@@ -111,7 +111,7 @@
     </div>
     {% if not search_query %}
     <button class="btn color-primary mt-4"
-            @click="openPanel('{% url 'invoicing:series_add' %}')">
+            hx-get="{% url 'invoicing:series_add' %}" hx-target="#main-content-area" hx-push-url="true">
         {% icon "add-outline" %}
         {% trans "Add First Series" %}
     </button>

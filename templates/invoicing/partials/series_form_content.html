@@ -3,7 +3,7 @@
 <!-- Header -->
 <div class="side-sheet-header">
     <h3 class="sheet-title">{% if series %}{% trans "Edit Series" %}{% else %}{% trans "Add Series" %}{% endif %}</h3>
-    <button class="sheet-close" @click="closePanel()">
+    <button class="sheet-close">
         {% icon "close-outline" %}
     </button>
 </div>
@@ -14,7 +14,6 @@
           hx-post="{% if series %}{% url 'invoicing:series_edit' series.id %}{% else %}{% url 'invoicing:series_add' %}{% endif %}"
           hx-target="#datatable-body"
           hx-swap="innerHTML"
-          @htmx:after-request="closePanel()"
           class="flex flex-col gap-4 p-6">
         {% csrf_token %}
 
@@ -90,7 +89,7 @@
 <!-- Footer -->
 <div class="side-sheet-footer">
     <div class="flex justify-end gap-2">
-        <button type="button" class="btn btn-ghost btn-sm" @click="closePanel()">
+        <button type="button" class="btn btn-ghost btn-sm">
             {% trans "Cancel" %}
         </button>
         <button type="submit" form="series-form" class="btn btn-sm color-primary">
