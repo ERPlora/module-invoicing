@@ -162,6 +162,7 @@
     </div>
 
     <div class="parties">
+        {% if invoice.customer_name %}
         <div class="party">
             <h3>{% trans "Bill To" %}</h3>
             <div class="name">{{ invoice.customer_name }}</div>
@@ -170,6 +171,7 @@
             {% if invoice.customer_email %}<p>{{ invoice.customer_email }}</p>{% endif %}
             {% if invoice.customer_phone %}<p>{{ invoice.customer_phone }}</p>{% endif %}
         </div>
+        {% endif %}
         <div class="party">
             <h3>{% trans "Invoice Details" %}</h3>
             <p><strong>{% trans "Series" %}:</strong> {{ invoice.series.prefix }} - {{ invoice.series.name }}</p>

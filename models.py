@@ -156,7 +156,7 @@ class Invoice(HubBaseModel):
 
     # Customer data (snapshot at invoice time — immutable)
     customer_name = models.CharField(
-        _('Customer Name'), max_length=255,
+        _('Customer Name'), max_length=255, blank=True, default='',
     )
     customer_tax_id = models.CharField(
         _('Customer Tax ID'), max_length=50, blank=True,
