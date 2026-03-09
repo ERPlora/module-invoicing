@@ -8,11 +8,11 @@
         <thead class="datatable-thead">
             <tr>
                 <th class="datatable-th datatable-th-checkbox">
-                    <label class="checkbox-input">
-                        <input type="checkbox"
+                    <label class="checkbox checkbox-sm">
+                        <input type="checkbox" class="checkbox-input"
                                :checked="selectAll"
                                @click="toggleAll([{% for inv in invoices %}'{{ inv.id }}'{% if not forloop.last %},{% endif %}{% endfor %}])">
-                        <span class="checkbox-mark"></span>
+                        <span class="checkbox-box"><svg class="checkbox-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
                     </label>
                 </th>
                 <th class="datatable-th">{% trans "Number" %}</th>
@@ -42,11 +42,11 @@
                 data-id="{{ invoice.id }}"
                 :class="{ 'datatable-tr-selected': selectedIds.includes('{{ invoice.id }}') }">
                 <td class="datatable-td datatable-td-checkbox" onclick="event.stopPropagation();">
-                    <label class="checkbox-input">
-                        <input type="checkbox"
+                    <label class="checkbox checkbox-sm">
+                        <input type="checkbox" class="checkbox-input"
                                :checked="selectedIds.includes('{{ invoice.id }}')"
                                @click="toggleSelect('{{ invoice.id }}')">
-                        <span class="checkbox-mark"></span>
+                        <span class="checkbox-box"><svg class="checkbox-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
                     </label>
                 </td>
                 <td class="datatable-td" data-label="{% trans 'Number' %}">
@@ -112,6 +112,7 @@
     <div class="datatable-per-page">
         {% trans "Show" %}
         <select name="per_page"
+                class="select select-sm"
                 hx-get="{% url 'invoicing:invoices' %}"
                 hx-target="#datatable-body"
                 hx-include="#invoices-datatable"
