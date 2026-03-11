@@ -70,12 +70,12 @@
                 fd.append('line_' + i + '_discount', line.discount);
                 fd.append('line_' + i + '_tax_rate', line.tax_rate || this.invoice.tax_rate);
                 fd.append('line_' + i + '_sku', line.sku || '');
-            },
+            });
 
             try {
                 const resp = await fetch('{% url 'invoicing:invoice_create' %}', {
                     method: 'POST', body: fd
-                },
+                });
                 const data = await resp.json();
                 if (data.ok && data.id) {
                     htmx.ajax('GET', '{% url 'invoicing:invoices' %}' + data.id + '/', '#main-content-area');
