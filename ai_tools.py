@@ -284,3 +284,180 @@ class UpdateInvoiceStatus(AssistantTool):
         else:
             return {"error": f"Cannot transition from '{inv.status}' to '{new_status}'"}
         return {"id": str(inv.id), "number": inv.number, "status": inv.status}
+
+
+@register_tool
+class UpdateInvoice(AssistantTool):
+    name = "update_invoice"
+    description = "Update editable fields on a draft invoice: notes, due_date, customer info. Does not modify totals."
+    module_id = "invoicing"
+    required_permission = "invoicing.change_invoice"
+    requires_confirmation = True
+    parameters = {
+        "type": "object",
+        "properties": {
+            "invoice_id": {"type": "string", "description": "Invoice ID"},
+            "number": {"type": "string", "description": "Invoice number (alternative to ID)"},
+            "notes": {"type": "string", "description": "Invoice notes"},
+            "due_date": {"type": "string", "description": "Due date (YYYY-MM-DD)"},
+            "customer_name": {"type": "string", "description": "Customer name"},
+            "customer_tax_id": {"type": "string", "description": "Customer tax ID"},
+            "customer_email": {"type": "string", "description": "Customer email"},
+            "customer_address": {"type": "string", "description": "Customer address"},
+            "customer_phone": {"type": "string", "description": "Customer phone"},
+        },
+        "required": [],
+        "additionalProperties": False,
+    }
+
+    def execute(self, args, request):
+        from invoicing.models import Invoice
+        if args.get('invoice_id'):
+            try:
+                inv = Invoice.objects.get(id=args['invoice_id'])
+            except Invoice.DoesNotExist:
+                return {"error": "Invoice not found"}
+        elif args.get('number'):
+            try:
+                inv = Invoice.objects.get(number=args['number'])
+            except Invoice.DoesNotExist:
+                return {"error": "Invoice not found"}
+        else:
+            return {"error": "Provide invoice_id or number"}
+        updatable = ['notes', 'due_date', 'customer_name', 'customer_tax_id',
+                     'customer_email', 'customer_address', 'customer_phone']
+        fields_updated = []
+        for field in updatable:
+            if field in args:
+                setattr(inv, field, args[field])
+                fields_updated.append(field)
+        if not fields_updated:
+            return {"error": "No fields to update"}
+        fields_updated.append('updated_at')
+        inv.save(update_fields=fields_updated)
+        return {"id": str(inv.id), "number": inv.number, "updated": fields_updated}
+
+
+@register_tool
+class DeleteInvoice(AssistantTool):
+    name = "delete_invoice"
+    description = "Delete a draft invoice. Only invoices with status=draft can be deleted."
+    module_id = "invoicing"
+    required_permission = "invoicing.delete_invoice"
+    requires_confirmation = True
+    parameters = {
+        "type": "object",
+        "properties": {
+            "invoice_id": {"type": "string", "description": "Invoice ID"},
+            "number": {"type": "string", "description": "Invoice number (alternative to ID)"},
+        },
+        "required": [],
+        "additionalProperties": False,
+    }
+
+    def execute(self, args, request):
+        from invoicing.models import Invoice
+        try:
+            if args.get('invoice_id'):
+                inv = Invoice.objects.get(id=args['invoice_id'])
+            elif args.get('number'):
+                inv = Invoice.objects.get(number=args['number'])
+            else:
+                return {"error": "Provide invoice_id or number"}
+        except Invoice.DoesNotExist:
+            return {"error": "Invoice not found"}
+        if inv.status != 'draft':
+            return {"error": f"Cannot delete invoice with status '{inv.status}'. Only draft invoices can be deleted."}
+        invoice_id = str(inv.id)
+        inv.delete()
+        return {"deleted": True, "id": invoice_id}
+
+
+@register_tool
+class BulkCreateInvoices(AssistantTool):
+    name = "bulk_create_invoices"
+    description = "Create multiple invoices at once (max 50)."
+    module_id = "invoicing"
+    required_permission = "invoicing.change_invoice"
+    requires_confirmation = True
+    parameters = {
+        "type": "object",
+        "properties": {
+            "invoices": {
+                "type": "array",
+                "description": "List of invoices to create (max 50)",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "customer_name": {"type": "string"},
+                        "customer_tax_id": {"type": "string"},
+                        "customer_email": {"type": "string"},
+                        "customer_address": {"type": "string"},
+                        "invoice_type": {"type": "string"},
+                        "due_date": {"type": "string"},
+                        "notes": {"type": "string"},
+                        "tax_rate": {"type": "number"},
+                        "lines": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "description": {"type": "string"},
+                                    "quantity": {"type": "number"},
+                                    "unit_price": {"type": "string"},
+                                    "discount_percent": {"type": "number"},
+                                },
+                                "required": ["description", "unit_price"],
+                                "additionalProperties": False,
+                            },
+                        },
+                    },
+                    "required": ["customer_name", "lines"],
+                    "additionalProperties": False,
+                },
+            },
+        },
+        "required": ["invoices"],
+        "additionalProperties": False,
+    }
+
+    def execute(self, args, request):
+        from decimal import Decimal
+        from invoicing.models import Invoice, InvoiceLine, InvoiceSeries
+        invoices = args['invoices']
+        if len(invoices) > 50:
+            return {"error": "Cannot create more than 50 invoices at once"}
+        series = InvoiceSeries.objects.filter(is_default=True, is_active=True).first()
+        if not series:
+            series = InvoiceSeries.objects.filter(is_active=True).first()
+        if not series:
+            return {"error": "No invoice series configured"}
+        created = []
+        for data in invoices:
+            inv = Invoice.objects.create(
+                series=series,
+                customer_name=data['customer_name'],
+                customer_tax_id=data.get('customer_tax_id', ''),
+                customer_email=data.get('customer_email', ''),
+                customer_address=data.get('customer_address', ''),
+                invoice_type=data.get('invoice_type', 'invoice'),
+                notes=data.get('notes', ''),
+                tax_rate=Decimal(str(data.get('tax_rate', 21))),
+            )
+            if data.get('due_date'):
+                inv.due_date = data['due_date']
+                inv.save(update_fields=['due_date'])
+            for i, line in enumerate(data.get('lines', [])):
+                InvoiceLine.objects.create(
+                    invoice=inv,
+                    description=line['description'],
+                    quantity=Decimal(str(line.get('quantity', 1))),
+                    unit_price=Decimal(line['unit_price']),
+                    discount_percent=Decimal(str(line.get('discount_percent', 0))),
+                    tax_rate=inv.tax_rate,
+                    order=i,
+                )
+            inv.calculate_totals()
+            inv.save()
+            created.append({"id": str(inv.id), "number": inv.number, "total": str(inv.total)})
+        return {"created": created, "count": len(created)}
