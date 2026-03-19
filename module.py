@@ -2,7 +2,11 @@ from django.utils.translation import gettext_lazy as _
 
 MODULE_ID = 'invoicing'
 MODULE_NAME = _('Invoicing')
-MODULE_VERSION = '1.0.0'
+MODULE_VERSION = '1.0.1'
+MODULE_ICON = 'document-text-outline'
+MODULE_DESCRIPTION = _('Create and manage invoices, credit notes, and billing')
+MODULE_AUTHOR = 'ERPlora'
+MODULE_CATEGORY = 'finance'
 
 MENU = {
     'label': _('Invoicing'),
