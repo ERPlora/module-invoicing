@@ -5,7 +5,8 @@
 | Property | Value |
 |----------|-------|
 | **Module ID** | `invoicing` |
-| **Version** | `1.0.0` |
+| **Version** | `1.0.1` |
+| **Category** | `finance` |
 | **Dependencies** | `customers`, `sales`, `inventory` |
 
 ## Dependencies
@@ -29,14 +30,14 @@ Per-hub invoicing configuration.
 | `company_address` | TextField | optional |
 | `company_phone` | CharField | max_length=50, optional |
 | `company_email` | EmailField | max_length=254, optional |
-| `default_series_prefix` | CharField | max_length=10 |
-| `auto_generate_invoice` | BooleanField |  |
-| `require_customer` | BooleanField |  |
+| `default_series_prefix` | CharField | max_length=10, default='F' |
+| `auto_generate_invoice` | BooleanField | default=False |
+| `require_customer` | BooleanField | default=True |
 | `invoice_footer` | TextField | optional |
 
 **Methods:**
 
-- `get_settings()`
+- `get_settings(hub_id)` — Get or create settings for a hub.
 
 ### `InvoiceSeries`
 
@@ -45,13 +46,13 @@ Examples: F (facturas), R (rectificativas), T (tickets).
 
 | Field | Type | Details |
 |-------|------|---------|
-| `prefix` | CharField | max_length=10 |
+| `prefix` | CharField | max_length=10, unique per hub |
 | `name` | CharField | max_length=100 |
 | `description` | TextField | optional |
-| `next_number` | PositiveIntegerField |  |
-| `is_active` | BooleanField |  |
-| `is_default` | BooleanField |  |
-| `number_digits` | PositiveSmallIntegerField |  |
+| `next_number` | PositiveIntegerField | default=1 |
+| `is_active` | BooleanField | default=True |
+| `is_default` | BooleanField | default=False, only one per hub |
+| `number_digits` | PositiveSmallIntegerField | default=6 |
 
 **Methods:**
 
@@ -63,29 +64,29 @@ Fiscal invoice document.
 
 | Field | Type | Details |
 |-------|------|---------|
-| `series` | ForeignKey | → `invoicing.InvoiceSeries`, on_delete=PROTECT |
+| `series` | ForeignKey | -> `invoicing.InvoiceSeries`, on_delete=PROTECT |
 | `number` | CharField | max_length=50, optional |
 | `invoice_type` | CharField | max_length=20, choices: invoice, simplified, rectifying |
 | `status` | CharField | max_length=20, choices: draft, issued, paid, cancelled |
-| `issue_date` | DateField |  |
+| `issue_date` | DateField | default=now |
 | `due_date` | DateField | optional |
 | `customer_name` | CharField | max_length=255, optional |
 | `customer_tax_id` | CharField | max_length=50, optional |
 | `customer_address` | TextField | optional |
 | `customer_email` | EmailField | max_length=254, optional |
 | `customer_phone` | CharField | max_length=50, optional |
-| `customer` | ForeignKey | → `customers.Customer`, on_delete=SET_NULL, optional |
-| `sale` | ForeignKey | → `sales.Sale`, on_delete=SET_NULL, optional |
-| `subtotal` | DecimalField |  |
-| `tax_rate` | DecimalField |  |
-| `tax_amount` | DecimalField |  |
-| `total` | DecimalField |  |
+| `customer` | ForeignKey | -> `customers.Customer`, on_delete=SET_NULL, optional |
+| `sale` | ForeignKey | -> `sales.Sale`, on_delete=SET_NULL, optional |
+| `subtotal` | DecimalField | max_digits=12 |
+| `tax_rate` | DecimalField | max_digits=5, default=21.00 |
+| `tax_amount` | DecimalField | max_digits=12 |
+| `total` | DecimalField | max_digits=12 |
 | `payment_method` | CharField | max_length=50, optional |
-| `paid_amount` | DecimalField |  |
+| `paid_amount` | DecimalField | max_digits=12 |
 | `paid_at` | DateTimeField | optional |
 | `notes` | TextField | optional |
-| `rectified_invoice` | ForeignKey | → `invoicing.Invoice`, on_delete=SET_NULL, optional |
-| `employee` | ForeignKey | → `accounts.LocalUser`, on_delete=SET_NULL, optional |
+| `rectified_invoice` | ForeignKey | -> `invoicing.Invoice`, on_delete=SET_NULL, optional |
+| `employee` | ForeignKey | -> `accounts.LocalUser`, on_delete=SET_NULL, optional |
 
 **Methods:**
 
@@ -98,16 +99,16 @@ Individual line item in an invoice.
 
 | Field | Type | Details |
 |-------|------|---------|
-| `invoice` | ForeignKey | → `invoicing.Invoice`, on_delete=CASCADE |
-| `product` | ForeignKey | → `inventory.Product`, on_delete=SET_NULL, optional |
+| `invoice` | ForeignKey | -> `invoicing.Invoice`, on_delete=CASCADE |
+| `product` | ForeignKey | -> `inventory.Product`, on_delete=SET_NULL, optional |
 | `product_sku` | CharField | max_length=50, optional |
 | `description` | CharField | max_length=500 |
-| `quantity` | DecimalField |  |
-| `unit_price` | DecimalField |  |
-| `discount_percent` | DecimalField |  |
-| `tax_rate` | DecimalField |  |
-| `total` | DecimalField |  |
-| `order` | PositiveSmallIntegerField |  |
+| `quantity` | DecimalField | max_digits=10, decimal_places=3 |
+| `unit_price` | DecimalField | max_digits=12 |
+| `discount_percent` | DecimalField | max_digits=5, default=0 |
+| `tax_rate` | DecimalField | max_digits=5, default=21.00 |
+| `total` | DecimalField | max_digits=12 |
+| `order` | PositiveSmallIntegerField | default=0 |
 
 **Methods:**
 
@@ -136,20 +137,20 @@ Base path: `/m/invoicing/`
 | `invoices/` | `invoices` | GET |
 | `invoices/new/` | `invoice_create` | GET/POST |
 | `invoices/<uuid:pk>/` | `invoice_detail` | GET |
-| `invoices/<uuid:pk>/issue/` | `invoice_issue` | GET |
-| `invoices/<uuid:pk>/cancel/` | `invoice_cancel` | GET |
-| `invoices/<uuid:pk>/delete/` | `invoice_delete` | GET/POST |
+| `invoices/<uuid:pk>/issue/` | `invoice_issue` | POST |
+| `invoices/<uuid:pk>/cancel/` | `invoice_cancel` | POST |
+| `invoices/<uuid:pk>/delete/` | `invoice_delete` | POST |
 | `invoices/<uuid:pk>/print/` | `invoice_print` | GET |
 | `series/` | `series` | GET |
 | `series/add/` | `series_add` | GET/POST |
-| `series/<uuid:pk>/edit/` | `series_edit` | GET |
-| `series/<uuid:pk>/delete/` | `series_delete` | GET/POST |
-| `series/<uuid:pk>/toggle/` | `series_toggle` | GET |
+| `series/<uuid:pk>/edit/` | `series_edit` | GET/POST |
+| `series/<uuid:pk>/delete/` | `series_delete` | POST |
+| `series/<uuid:pk>/toggle/` | `series_toggle` | POST |
 | `settings/` | `settings` | GET |
-| `settings/save/` | `settings_save` | GET/POST |
-| `settings/toggle/` | `settings_toggle` | GET |
-| `settings/input/` | `settings_input` | GET |
-| `settings/reset/` | `settings_reset` | GET |
+| `settings/save/` | `settings_save` | POST |
+| `settings/toggle/` | `settings_toggle` | POST |
+| `settings/input/` | `settings_input` | POST |
+| `settings/reset/` | `settings_reset` | POST |
 | `api/invoices/` | `api_invoices` | GET |
 
 ## Permissions
@@ -197,9 +198,15 @@ List invoices with optional filters. Returns number, customer, status, total, da
 | `search` | string | No | Search by customer name or invoice number |
 | `limit` | integer | No | Max results (default 20) |
 
+**Permission:** `invoicing.view_invoice`
+
 ### `get_pending_invoices`
 
 Get invoices that are issued but not yet paid, with aging info.
+
+No parameters.
+
+**Permission:** `invoicing.view_invoice`
 
 ### `get_invoice`
 
@@ -207,8 +214,10 @@ Get detailed info for a specific invoice including items.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `invoice_id` | string | No |  |
-| `number` | string | No |  |
+| `invoice_id` | string | No | Invoice UUID |
+| `number` | string | No | Invoice number (alternative to ID) |
+
+**Permission:** `invoicing.view_invoice`
 
 ### `get_invoicing_summary`
 
@@ -216,12 +225,14 @@ Get invoicing summary: total invoiced, total paid, total pending, by period.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `date_from` | string | No |  |
-| `date_to` | string | No |  |
+| `date_from` | string | No | Start date (YYYY-MM-DD) |
+| `date_to` | string | No | End date (YYYY-MM-DD) |
+
+**Permission:** `invoicing.view_invoice`
 
 ### `create_invoice`
 
-Create a new invoice with line items.
+Create a new invoice with line items. Requires confirmation.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
@@ -233,11 +244,31 @@ Create a new invoice with line items.
 | `due_date` | string | No | Due date (YYYY-MM-DD) |
 | `notes` | string | No | Invoice notes |
 | `tax_rate` | number | No | Tax rate percentage (default from settings) |
-| `lines` | array | Yes | Line items |
+| `lines` | array | Yes | Line items (each: description, quantity, unit_price, discount_percent) |
+
+**Permission:** `invoicing.change_invoice`
+
+### `update_invoice`
+
+Update editable fields on a draft invoice: notes, due_date, customer info. Does not modify totals. Requires confirmation.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `invoice_id` | string | No | Invoice UUID |
+| `number` | string | No | Invoice number (alternative to ID) |
+| `notes` | string | No | Invoice notes |
+| `due_date` | string | No | Due date (YYYY-MM-DD) |
+| `customer_name` | string | No | Customer name |
+| `customer_tax_id` | string | No | Customer tax ID |
+| `customer_email` | string | No | Customer email |
+| `customer_address` | string | No | Customer address |
+| `customer_phone` | string | No | Customer phone |
+
+**Permission:** `invoicing.change_invoice`
 
 ### `update_invoice_status`
 
-Update invoice status: issue (draft→issued), mark paid, or cancel.
+Update invoice status: issue (draft->issued), mark paid, or cancel. Requires confirmation.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
@@ -246,12 +277,37 @@ Update invoice status: issue (draft→issued), mark paid, or cancel.
 | `status` | string | Yes | New status: issued, paid, cancelled |
 | `payment_method` | string | No | Payment method (when marking as paid) |
 
+**Permission:** `invoicing.change_invoice`
+
+### `delete_invoice`
+
+Delete a draft invoice. Only invoices with status=draft can be deleted. Requires confirmation.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `invoice_id` | string | No | Invoice UUID |
+| `number` | string | No | Invoice number (alternative to ID) |
+
+**Permission:** `invoicing.delete_invoice`
+
+### `bulk_create_invoices`
+
+Create multiple invoices at once (max 50). Requires confirmation.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `invoices` | array | Yes | List of invoices (max 50). Each item has same schema as `create_invoice`. |
+
+**Permission:** `invoicing.change_invoice`
+
 ## File Structure
 
 ```
+.gitignore
 CHANGELOG.md
 README.md
 __init__.py
+ai_context.py
 ai_tools.py
 apps.py
 forms.py
@@ -264,7 +320,6 @@ locale/
       django.po
 migrations/
   0001_initial.py
-  0002_customer_name_optional.py
   __init__.py
 models.py
 module.py
