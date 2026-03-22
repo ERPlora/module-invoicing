@@ -234,7 +234,7 @@
 </div>
 
 {% if invoice %}
-<script>
+<script nonce="{{ csp_nonce }}">
 function issueInvoice() {
     if (!confirm('{% trans "Issue this invoice? This will assign an invoice number. This action cannot be undone." %}')) return;
     fetch('{% url "invoicing:invoice_issue" invoice.id %}', {

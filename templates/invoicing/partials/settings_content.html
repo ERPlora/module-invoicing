@@ -207,7 +207,7 @@
     </div>
 </div>
 
-<script>
+<script nonce="{{ csp_nonce }}">
 function resetSettings() {
     if (!confirm('{% trans "Reset all invoicing settings to their default values?" %}')) return;
     fetch('{% url "invoicing:settings_reset" %}', {
