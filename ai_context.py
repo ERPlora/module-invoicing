@@ -68,3 +68,30 @@ CONTEXT = """
 - facturae_b2b.EInvoice → Invoice (OneToOne, related_name `einvoice`)
 - verifactu.VerifactuRecord → Invoice (FK, related_name `verifactu_records`)
 """
+
+SOPS = [
+    {
+        "id": "new_invoice",
+        "triggers": {
+            "es": ["crear factura", "nueva factura", "emitir factura", "facturar"],
+            "en": ["create invoice", "new invoice", "issue invoice"],
+        },
+        "description": {"es": "Crear una nueva factura", "en": "Create a new invoice"},
+        "steps": [
+            {"tool": "create_invoice", "description": "Create invoice with customer and line items"},
+        ],
+        "modules_required": ["invoicing"],
+    },
+    {
+        "id": "pending_invoices",
+        "triggers": {
+            "es": ["facturas pendientes", "facturas sin cobrar", "facturas impagadas"],
+            "en": ["pending invoices", "unpaid invoices", "outstanding invoices"],
+        },
+        "description": {"es": "Ver facturas pendientes", "en": "View pending invoices"},
+        "steps": [
+            {"tool": "get_pending_invoices", "description": "List all pending/unpaid invoices"},
+        ],
+        "modules_required": ["invoicing"],
+    },
+]
