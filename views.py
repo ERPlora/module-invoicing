@@ -19,6 +19,7 @@ from apps.modules_runtime.navigation import with_module_nav
 
 from .models import InvoicingSettings, InvoiceSeries, Invoice, InvoiceLine
 from .forms import InvoiceSeriesForm, InvoicingSettingsForm
+from apps.core.scheduled_tasks import get_module_scheduled_tasks
 
 
 # ---------------------------------------------------------------------------
@@ -568,7 +569,8 @@ def settings(request):
     hub = _hub(request)
     settings_obj = InvoicingSettings.get_settings(hub)
     form = InvoicingSettingsForm(instance=settings_obj)
-    return {'form': form, 'settings': settings_obj}
+    return {
+        'scheduled_tasks': get_module_scheduled_tasks('invoicing'),'form': form, 'settings': settings_obj}
 
 
 @login_required
