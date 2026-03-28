@@ -7,6 +7,7 @@ MODULE_ICON = 'document-text-outline'
 MODULE_DESCRIPTION = _('Create and manage invoices, credit notes, and billing')
 MODULE_AUTHOR = 'ERPlora'
 MODULE_CATEGORY = 'finance'
+HAS_MODELS = True
 
 MENU = {
     'label': _('Invoicing'),
