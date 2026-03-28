@@ -57,3 +57,11 @@ ROLE_PERMISSIONS = {
         "view_series",
     ],
 }
+
+SCHEDULED_TASKS = [
+    {
+        'task': 'invoicing.send_overdue_reminders',
+        'cron': '0 9 * * *',
+        'description': 'Send payment reminders for overdue invoices',
+    },
+]
