@@ -119,10 +119,12 @@ def _dashboard_context(request):
         sum_paid=Sum('total', filter=Q(status='paid')),
     )
 
-    # Overall stats
-    draft_count = invoices.filter(status='draft').count()
-    issued_count = invoices.filter(status='issued').count()
-    paid_count = invoices.filter(status='paid').count()
+    # Overall stats (single query)
+    status_counts = invoices.aggregate(
+        draft_count=Count('id', filter=Q(status='draft')),
+        issued_count=Count('id', filter=Q(status='issued')),
+        paid_count=Count('id', filter=Q(status='paid')),
+    )
 
     recent = invoices.order_by('-created_at')[:10]
 
@@ -130,9 +132,9 @@ def _dashboard_context(request):
         'monthly_total': monthly['sum_total'] or Decimal('0.00'),
         'monthly_count': monthly['count'] or 0,
         'monthly_paid': monthly['sum_paid'] or Decimal('0.00'),
-        'draft_count': draft_count,
-        'issued_count': issued_count,
-        'paid_count': paid_count,
+        'draft_count': status_counts['draft_count'],
+        'issued_count': status_counts['issued_count'],
+        'paid_count': status_counts['paid_count'],
         'recent_invoices': recent,
     }
 
